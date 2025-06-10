@@ -1,4 +1,4 @@
-# latop.sys – Latency Optimized Keyboard Filter Driver
+# latop.sys – Latency Optimized Keyboard Driver
 
 Author's note: This Driver is currently untested. Use at your own risk. 
 
