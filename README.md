@@ -4,7 +4,7 @@ Author's note: This Driver is currently untested. Use at your own risk.
 
 ## 🧠 Overview
 
-**`latop.sys`** is a Windows kernel-mode filter driver designed to reduce input latency from the keyboard by intervening in the IRP's (I/O Request Packet) processing path. It does this with a combination of **thread priority boosting** and **CPU affinity pinning**, which minimizes **Context Switches**. 
+**`latop.sys`** is a Windows kernel-mode filter driver designed to reduce input latency from the keyboard by intervening in the IRP's (I/O Request Packet) processing path. It intercepts `IRP_MJ_READ` requests for the keyboard and temporarily boosts the thread's scheduling context (priority and affinity) during processing. It does not alter or reroute the IRP, ensuring full compatibility with the existing driver stack.
 
 
 ---
