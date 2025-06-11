@@ -94,7 +94,7 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 	//validate IRP and parameters, to ensure validity of inputs
 	if (!irp || !stackLocation || !deviceExtension->LowerDeviceObject) {
 		KdPrint(("Error: Invalid irp (0x%08X)\n", STATUS_INVALID_PARAMETER));
-		//ExFreePoolWithTag(oldinfo, 'CTXT'); I'm unsure whether I should add this here or not.
+		ExFreePoolWithTag(contextinfo, 'CTXT');//releases and frees the allocated memory pool in case of an error. 
 		KeSetPriorityThread(thread, contextinfo->oldprio); //restores the old priority in case of failure.
 		KeRevertToUserAffinityThreadEx(contextinfo->oldaffinity); //restores the old affinity in case of failure.
 		return STATUS_INVALID_PARAMETER;
@@ -112,7 +112,7 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 		irp->IoStatus.Status = status;
 		irp->IoStatus.Information = 0;
 		IoCompleteRequest(irp, IO_NO_INCREMENT);
-		//ExFreePoolWithTag(oldinfo, 'CTXT'); I'm unsure whether I should add this here or not. 
+		ExFreePoolWithTag(contextinfo, 'CTXT'); //releases and frees the allocated memory pool in case of an error
 		KeSetPriorityThread(thread, contextinfo->oldprio); //restores the old priority in case of failure.
 		KeRevertToUserAffinityThreadEx(contextinfo->oldaffinity); //restores the old affinity in case of failure.
 		KdPrint(("Error: invalid irp: (0x%08X)\n", status));
@@ -131,8 +131,8 @@ NTSTATUS DeviceAttach(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT ActualKeyboard
 	
 	PDEVICE_OBJECT filter = NULL;
 	PDEVICE_OBJECT LowerDeviceObject = NULL;
-	UNICODE_STRING devname = RTL_CONSTANT_STRING(L"\\Device\\latop");
-	status = IoCreateDevice(DriverObject, sizeof(DEVICE_EXTENSION), &devname, ActualKeyboard->DeviceType, 0, FALSE, &filter);
+	
+	status = IoCreateDevice(DriverObject, sizeof(DEVICE_EXTENSION), NULL, ActualKeyboard->DeviceType, 0, FALSE, &filter);
 	if (!NT_SUCCESS(status)) {
 		 
 		KdPrint(("Failed to create device Object (0x%08X)\n", status));
