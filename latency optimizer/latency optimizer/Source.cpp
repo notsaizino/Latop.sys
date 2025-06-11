@@ -65,10 +65,9 @@ void latopUnload(PDRIVER_OBJECT DriverObject) //FINISHED.
 
 NTSTATUS PassThru(PDEVICE_OBJECT DeviceObject, PIRP irp) {//FINISHED
 	UNREFERENCED_PARAMETER(DeviceObject);
-	irp->IoStatus.Information = 0;//value of 0 is fine here.
-	irp->IoStatus.Status = STATUS_SUCCESS;//expected status return.
-	IoCompleteRequest(irp, IO_NO_INCREMENT); //Complete IRP request.
-	return STATUS_SUCCESS;
+	PDEVICE_EXTENSION deviceExtension = (PDEVICE_EXTENSION)DeviceObject->DeviceExtension; //finds LowerDeviceObject.
+	IoSkipCurrentIrpStackLocation(irp); //skips my driver's location, to go to the LowerDeviceObject's location.
+	return IoCallDriver(deviceExtension->LowerDeviceObject, irp); //Hands off the irp to the LowerDeviceObject's driver, aka the keyboard's driver.
 }
 NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 {
