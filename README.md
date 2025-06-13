@@ -71,7 +71,7 @@ Planned improvements:
 
 - Add a **symbolic link interface** for optional user-mode interaction.
 - Explore:
-  - DMA strategies for batching input IRPs
+  - IRP Batching, and USB Polling via URB_FUNCTION_INTERRUPT_TRANSFER_
   - Real-time input logging and timestamp analysis
   - Kernel bypass optimizations
 - Possibly integrate registry configuration for tuning affinity/priority.
