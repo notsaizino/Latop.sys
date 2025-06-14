@@ -195,7 +195,7 @@ NTSTATUS CompletionRoutine(PDEVICE_OBJECT DeviceObject, PIRP irp, PVOID Context)
 	PMY_COMPLETION_CONTEXT oldinfo = (PMY_COMPLETION_CONTEXT)Context; //typecasting PVOID context to PMY_COMPLETION_CONTEXT.
 	KeSetPriorityThread(oldinfo->thread, oldinfo->oldprio);//restores the old prio to the thread.
 	KeRevertToUserAffinityThreadEx(oldinfo->oldaffinity);//restores the old affinity of the thread.
-	ObDereferenceObject(oldinfo->thread);//necessary in order not to have an "eye" that is seeing nothing. (memory leak)
+	ObDereferenceObject(oldinfo->thread);
 	ExFreePoolWithTag(oldinfo, 'CTXT');//frees the paged memory pool.
 	return STATUS_SUCCESS;
 }

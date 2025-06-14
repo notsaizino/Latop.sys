@@ -1,9 +1,9 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "C:\\Users\\rapam\\Documents\\GitHub\\Latop.sys\\latency optimizer\\",
+  "WorkspaceRootPath": "V:\\My_Stuff\\prog\\Micro-cuckDrivers\\latency_optimizer\\latency optimizer\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{564CC3B3-6CFA-5F2D-CD52-C83C99AB7D08}|latency optimizer\\latency optimizer.vcxproj|C:\\Users\\rapam\\Documents\\GitHub\\Latop.sys\\latency optimizer\\latency optimizer\\Source.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "AbsoluteMoniker": "D:0:0:{564CC3B3-6CFA-5F2D-CD52-C83C99AB7D08}|latency optimizer\\latency optimizer.vcxproj|V:\\My_Stuff\\prog\\Micro-cuckDrivers\\latency_optimizer\\latency optimizer\\latency optimizer\\Source.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{564CC3B3-6CFA-5F2D-CD52-C83C99AB7D08}|latency optimizer\\latency optimizer.vcxproj|solutionrelative:latency optimizer\\Source.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     }
   ],
@@ -24,11 +24,11 @@
               "$type": "Document",
               "DocumentIndex": 0,
               "Title": "Source.cpp",
-              "DocumentMoniker": "C:\\Users\\rapam\\Documents\\GitHub\\Latop.sys\\latency optimizer\\latency optimizer\\Source.cpp",
+              "DocumentMoniker": "V:\\My_Stuff\\prog\\Micro-cuckDrivers\\latency_optimizer\\latency optimizer\\latency optimizer\\Source.cpp",
               "RelativeDocumentMoniker": "latency optimizer\\Source.cpp",
-              "ToolTip": "C:\\Users\\rapam\\Documents\\GitHub\\Latop.sys\\latency optimizer\\latency optimizer\\Source.cpp",
+              "ToolTip": "V:\\My_Stuff\\prog\\Micro-cuckDrivers\\latency_optimizer\\latency optimizer\\latency optimizer\\Source.cpp",
               "RelativeToolTip": "latency optimizer\\Source.cpp",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAIsAAAABAAAAAAAAAA==",
+              "ViewState": "AgIAADAAAAAAAAAAAAAAADwAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2025-06-09T14:25:54.556Z",
               "EditorCaption": ""
