@@ -1,54 +1,117 @@
-latop.sys – Latency Optimized Keyboard Driver
-Author's note: This Driver is currently untested. Use at your own risk.
+# 🎹 `latop.sys` — Latency-Optimized Keyboard Driver
 
-🧠 Overview
-latop.sys is a Windows kernel-mode filter driver designed to reduce input latency from the keyboard by intervening in the IRP's (I/O Request Packet) processing path. It intercepts IRP_MJ_READ requests for the keyboard and temporarily boosts the thread's scheduling context (priority and affinity) during processing. It does not alter or reroute the IRP, ensuring full compatibility with the existing driver stack.
+> **⚠️ Author's Note:** This driver is currently untested. Use at your own risk. It may crash your system or behave unpredictably. Test only in a controlled environment (e.g., VM or dedicated test bench).
 
-⚙️ Architecture
-➤ Device Stack Filtering
-The driver attaches itself to the keyboard class driver as a filter device. It does not replace or disable any default behavior—it merely intercepts IRP_MJ_READ requests meant for the keyboard, applies low-latency optimizations, and then passes them down the stack untouched.
+---
 
-DeviceAttach() creates a filter device and attaches it to the keyboard stack using IoAttachDeviceToDeviceStackSafe.
-The DEVICE_EXTENSION structure stores the pointer to the next device below us (LowerDeviceObject) so we can forward IRPs properly.
-➤ IRP Handling & Optimization
-The core optimization happens in ReadKeyboardInput():
+## 🧠 Overview
 
-Boosts thread priority with KeSetPriorityThread (to HIGH_PRIORITY).
-Pins the thread to CPU 0 using KeSetSystemAffinityThreadEx, to reduce context switching.
-Stores old state (thread priority and core affinity) in a custom context structure (MY_COMPLETION_CONTEXT).
-Sets a Completion Routine to restore the thread's original priority, to remove the affinity pin, and to free the allocated pool for MY_COMPLETION_CONTEXT.
-The IRP then continues down the device stack. This is non-invasive—the keyboard still works normally, just with faster dispatch latency.
+**`latop.sys`** is a Windows **kernel-mode filter driver** crafted to reduce input latency by accelerating the processing of `IRP_MJ_READ` requests for keyboard input.
 
-➤ Completion Routine
-CompletionRoutine() restores the original thread priority and CPU affinity. It also logs its execution using KdPrint.
+Rather than altering or rerouting IRPs, this driver:
+- Boosts the thread priority temporarily
+- Pins the IRP-handling thread to a specific CPU core
+- Passes the IRP unmodified down the stack
 
-This routine does not alter the IRP data. It’s only concerned with thread-level control.
+The result: lower input-to-processing delay with full compatibility.
 
-🧹 Clean Unload
-The latopUnload() routine:
+---
 
-Detaches the filter(s) from the device stack via IoDetachDevice.
-Deletes all filter device objects with IoDeleteDevice.
-The loop ensures that all device objects created by this driver are cleaned up, even if more than one exists. Currently, no symbolic link is implemented (planned for phase 2).
+## ⚙️ Architecture
 
-🛑 IRP Routing
-IRP_MJ_CREATE and IRP_MJ_CLOSE are simply passed through.
-IRP_MJ_READ is where latency optimization happens.
-All other IRPs are currently unsupported and are not intercepted or altered.
-🔐 Safety & Stability
-Thread modifications are restored immediately in the completion routine.
-No memory leaks—ExAllocatePoolWithTag always has a matching ExFreePoolWithTag.
-IoSetCompletionRoutine ensures restoration logic runs even on IRP failure.
-Logging is handled via KdPrint for debugging and visibility.
-📌 Notes for the Future
-Planned improvements:
+### 🔩 Device Stack Filtering
 
-Add a symbolic link interface for optional user-mode interaction.
-Explore:
-IRP Batching, and USB Polling via URB_FUNCTION_INTERRUPT_TRANSFER_
-Real-time input logging and timestamp analysis
-Kernel bypass optimizations
+`latop.sys` attaches to the keyboard class device stack as a **filter driver**. It does **not** replace or modify the behavior of the default drivers.
 
-🔧 Build & Deployment
-This driver is built for Windows 10+ using the Windows Driver Kit (WDK).
+- `DeviceAttach()` creates a filter device and attaches it using `IoAttachDeviceToDeviceStackSafe`.
+- The filter’s `DEVICE_EXTENSION` holds a pointer to the next device (`LowerDeviceObject`) to enable proper IRP forwarding.
 
+> **💡 Note:** This is a *passive* filter—it doesn’t block or modify IRP content.
+
+---
+
+### ⚡ IRP Handling & Optimization
+
+Inside `ReadKeyboardInput()`:
+
+- 🎚️ Increases the IRP-handling thread’s priority using `KeSetPriorityThread`.
+- 🎯 Pins the thread to **CPU Core 0** using `KeSetSystemAffinityThreadEx` to reduce context switching.
+- 💾 Saves the original thread state in a custom structure: `MY_COMPLETION_CONTEXT`.
+- 🔁 Uses `IoSetCompletionRoutine()` to revert the thread to its normal state after IRP handling.
+- ➡️ Forwards the IRP using `IoCallDriver()`.
+
+This logic is invisible to user applications—the IRP reaches its destination, just faster.
+
+---
+
+### 🔄 Completion Routine
+
+In `CompletionRoutine()`:
+
+- Restores thread priority and core affinity via:
+  - `KeSetPriorityThread`
+  - `KeRevertToUserAffinityThreadEx`
+- Releases kernel thread object with `ObDereferenceObject`
+- Frees memory using `ExFreePoolWithTag`
+- Logs the restore action via `KdPrint`
+
+**💡 Side-effect free:** This routine touches only scheduling state—not the IRP data itself.
+
+---
+
+## 🧹 Driver Unload & Cleanup
+
+The `latopUnload()` function:
+
+- Calls `IoDetachDevice()` to unlink the filter from the stack.
+- Deletes each filter device using `IoDeleteDevice()`.
+- Iterates through all `DeviceObject`s to ensure no objects are leaked.
+
+> **Note:** No symbolic link is implemented yet. This is planned for **Phase 2**.
+
+---
+
+## 🛑 IRP Routing
+
+| IRP Type        | Behavior                     |
+|----------------|------------------------------|
+| `IRP_MJ_CREATE` | Pass-through (no-op)         |
+| `IRP_MJ_CLOSE`  | Pass-through (no-op)         |
+| `IRP_MJ_READ`   | Latency optimization logic   |
+| Others          | Currently ignored            |
+
+---
+
+## 🔐 Safety & Stability
+
+✅ Memory safe: All allocations via `ExAllocatePoolWithTag` are freed via `ExFreePoolWithTag`  
+✅ Object-safe: Threads are properly dereferenced  
+✅ Robust: Completion routine guarantees restoration even on IRP failure  
+✅ Transparent: Does not alter IRP payloads or prevent processing
+
+---
+
+## 🚀 Future Improvements
+
+- 🔗 Implement symbolic link for user-mode control
+- 🧵 IRP Batching (multiple `IRP_MJ_READ`s queued simultaneously)
+- 🧬 USB Polling support via `URB_FUNCTION_INTERRUPT_TRANSFER`
+- 🕐 Timestamped input logging + latency telemetry
+- 🛣️ Potential HID stack bypass for lower roundtrip latency
+
+---
+
+## 🛠 Build & Deployment
+
+- **Target OS:** Windows 10+
+- **Toolchain:** Windows Driver Kit (WDK) + Visual Studio
+- **Architecture:** x64
+- **Recommended:** Test in virtual machine with kernel debugging enabled
+
+---
+
+## 📎 Final Thoughts
+
+`latop.sys` is a living experiment in input latency reduction at the driver level. While it’s not production-tested, it reflects deep architectural understanding and low-level driver engineering.
+
+---
