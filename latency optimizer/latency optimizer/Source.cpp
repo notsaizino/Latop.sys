@@ -140,7 +140,10 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 }
 
 NTSTATUS DeviceAttach(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT ActualKeyboard) //automatically called by the PNP Manager when it wants to add the device.
-{
+{ // For USB polling: Attach as upper filter to hidusb.sys to intercept URBs (embedded in IRPs).  
+  // Goal: Reduce OS scheduling delay between URB completion and input delivery.  
+  // Note: USB poll interval (bInterval) may limit minimum latency.  
+
 	NTSTATUS status = STATUS_SUCCESS; //initialize the status variable we will use.
 
 	PDEVICE_OBJECT filter = NULL;
