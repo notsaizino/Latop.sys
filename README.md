@@ -1,117 +1,89 @@
-# 🎹 `latop.sys` — Latency-Optimized Keyboard Driver
+# latop.sys — Windows Keyboard Latency Optimizer
 
-> **⚠️ Author's Note:** This driver is currently untested. Use at your own risk. It may crash your system or behave unpredictably. Test only in a controlled environment (e.g., VM or dedicated test bench).
-
----
-
-## 🧠 Overview
-
-**`latop.sys`** is a Windows **kernel-mode filter driver** crafted to reduce input latency by accelerating the processing of `IRP_MJ_READ` requests for keyboard input.
-
-Rather than altering or rerouting IRPs, this driver:
-- Boosts the thread priority temporarily
-- Pins the IRP-handling thread to a specific CPU core
-- Passes the IRP unmodified down the stack
-
-The result: lower input-to-processing delay with full compatibility.
+**Author:** [Amr Hamail]  
+**Type:** Windows Kernel-Mode WDM Filter Driver  
+**Purpose:** Reduce keyboard input latency by dynamically elevating thread priority and pinning threads to specific CPU cores.  
+**Status:** Active Development
 
 ---
 
-## ⚙️ Architecture
+## ⚡ Overview
 
-### 🔩 Device Stack Filtering
+`latop.sys` is a handcrafted Windows kernel filter driver designed to reduce input lag at the system level. It intercepts keyboard read IRPs and temporarily boosts the processing thread’s priority while pinning it to a single CPU core — reducing context switching and speeding up IRP completion.
 
-`latop.sys` attaches to the keyboard class device stack as a **filter driver**. It does **not** replace or modify the behavior of the default drivers.
+Built entirely on the Windows Driver Model (WDM), `latop.sys` provides complete control over IRP propagation, thread scheduling, and low-level latency behavior.
 
-- `DeviceAttach()` creates a filter device and attaches it using `IoAttachDeviceToDeviceStackSafe`.
-- The filter’s `DEVICE_EXTENSION` holds a pointer to the next device (`LowerDeviceObject`) to enable proper IRP forwarding.
-
-> **💡 Note:** This is a *passive* filter—it doesn’t block or modify IRP content.
+Every design decision — from how memory is allocated to how the IRP stack is copied — was made deliberately, from scratch, to achieve minimal input-to-response delay.
 
 ---
 
-### ⚡ IRP Handling & Optimization
+## 🧠 Technical Highlights
 
-Inside `ReadKeyboardInput()`:
+- **Thread Latency Optimization**  
+  Uses `\texttt{KeSetPriorityThread}` to boost IRQL-handling threads to high priority and `\texttt{KeSetSystemAffinityThreadEx}` to lock them to a CPU core during IRP servicing.
 
-- 🎚️ Increases the IRP-handling thread’s priority using `KeSetPriorityThread`.
-- 🎯 Pins the thread to **CPU Core 0** using `KeSetSystemAffinityThreadEx` to reduce context switching.
-- 💾 Saves the original thread state in a custom structure: `MY_COMPLETION_CONTEXT`.
-- 🔁 Uses `IoSetCompletionRoutine()` to revert the thread to its normal state after IRP handling.
-- ➡️ Forwards the IRP using `IoCallDriver()`.
+- **IRP Lifecycle Management**  
+  Intercepts and propagates IRPs using `\texttt{IoCopyCurrentIrpStackLocationToNext}`, `\texttt{IoCallDriver}`, and stack-aware completion via `\texttt{IoSetCompletionRoutine}`.
 
-This logic is invisible to user applications—the IRP reaches its destination, just faster.
+- **Safe Context Handling**  
+  Allocates thread-state data in non-paged memory (priority, affinity, thread object) and safely restores it post-completion, even during edge-case interruptions.
 
----
-
-### 🔄 Completion Routine
-
-In `CompletionRoutine()`:
-
-- Restores thread priority and core affinity via:
-  - `KeSetPriorityThread`
-  - `KeRevertToUserAffinityThreadEx`
-- Releases kernel thread object with `ObDereferenceObject`
-- Frees memory using `ExFreePoolWithTag`
-- Logs the restore action via `KdPrint`
-
-**💡 Side-effect free:** This routine touches only scheduling state—not the IRP data itself.
+- **Stack Integrity & Modularity**  
+  Designed as a class filter driver with full support for passthrough logic, stack-safe detachment, and minimal disruption to device behavior.
 
 ---
 
-## 🧹 Driver Unload & Cleanup
+## 🚧 Limitations
 
-The `latopUnload()` function:
-
-- Calls `IoDetachDevice()` to unlink the filter from the stack.
-- Deletes each filter device using `IoDeleteDevice()`.
-- Iterates through all `DeviceObject`s to ensure no objects are leaked.
-
-> **Note:** No symbolic link is implemented yet. This is planned for **Phase 2**.
+- **No symbolic link or user-mode interface** — all logic operates purely at kernel level.
+- **Currently supports only keyboard class stack (kbdclass.sys)** — future HID/USB-level support planned.
+- **Test environments only** — use in production environments may lead to instability.
 
 ---
 
-## 🛑 IRP Routing
+## 🛠️ Build Instructions
 
-| IRP Type        | Behavior                     |
-|----------------|------------------------------|
-| `IRP_MJ_CREATE` | Pass-through (no-op)         |
-| `IRP_MJ_CLOSE`  | Pass-through (no-op)         |
-| `IRP_MJ_READ`   | Latency optimization logic   |
-| Others          | Currently ignored            |
+1. Open in Visual Studio with WDK installed.
+2. Build in **x64 Release** mode.
+3. Load using test-signing or via tools like OSR Loader.
 
 ---
 
-## 🔐 Safety & Stability
+## 🔭 Future Enhancements
 
-✅ Memory safe: All allocations via `ExAllocatePoolWithTag` are freed via `ExFreePoolWithTag`  
-✅ Object-safe: Threads are properly dereferenced  
-✅ Robust: Completion routine guarantees restoration even on IRP failure  
-✅ Transparent: Does not alter IRP payloads or prevent processing
-
----
-
-## 🚀 Future Improvements
-
-- 🔗 Implement symbolic link for user-mode control
-- 🧵 IRP Batching (multiple `IRP_MJ_READ`s queued simultaneously)
-- 🧬 USB Polling support via `URB_FUNCTION_INTERRUPT_TRANSFER`
-- 🕐 Timestamped input logging + latency telemetry
-- 🛣️ Potential HID stack bypass for lower roundtrip latency
+- IRP batching and coalescing to further reduce latency bursts
+- URB-level optimization targeting USB polling delays
+- Integration with `10xclick.sys` for full input stack acceleration.
+- Plan to use 10xclick.sys as base to develop a driver for N-key rolling for USB keyboards. It is a forgotten feature of many PS/2 Keyboards. 
 
 ---
 
-## 🛠 Build & Deployment
+## 🙇 A Word from the Author
 
-- **Target OS:** Windows 10+
-- **Toolchain:** Windows Driver Kit (WDK) + Visual Studio
-- **Architecture:** x64
-- **Recommended:** Test in virtual machine with kernel debugging enabled
+This driver is the product of curiosity and love for Windows internals — not corporate demand. I built this project line by line because I wanted to understand what happens *between* a keystroke and the software it reaches.  
 
 ---
 
-## 📎 Final Thoughts
+## 📜 License
 
-`latop.sys` is a living experiment in input latency reduction at the driver level. While it’s not production-tested, it reflects deep architectural understanding and low-level driver engineering.
+MIT License  
+
+Copyright (c) 2025 [Amr Hamail]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy  
+of this software and associated documentation files (the "Software"), to deal  
+in the Software without restriction, including without limitation the rights  
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell  
+copies of the Software, and to permit persons to whom the Software is  
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all  
+copies or substantial portions of the Software.
+
+**THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,**  
+**INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.**  
+**IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,**  
+**WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.**
 
 ---
+
