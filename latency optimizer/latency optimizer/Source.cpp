@@ -72,7 +72,7 @@ NTSTATUS PassThru(PDEVICE_OBJECT DeviceObject, PIRP irp) {//FINISHED
 NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 {
 
-	UNREFERENCED_PARAMETER(DeviceObject);
+	
 	//initiates a contextinfo struct, which contains oldaffinity, oldpriority and the targetted thread. this will be passed to "IoSetCompletionRoutine" as the "context" argument.
 	PMY_COMPLETION_CONTEXT contextinfo = (PMY_COMPLETION_CONTEXT)ExAllocatePoolWithTag(NonPagedPool, sizeof(MY_COMPLETION_CONTEXT), 'CTXT'); //allocates memory from the non-paged memory pool corresponding to the size of my struct. 
 	//contextinfo will be passed as the "context" argument in IoSetCompletionRoutine; 
@@ -81,7 +81,13 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 	PKTHREAD thread;
-	PsLookupThreadByThreadId(PsGetCurrentThreadId, &thread); //safe way to get the thread that is working on the IRP. This was buggy before, as if the thread exits before CompletionRoutine does, it'll do a BSOD (referencing a dead thread).
+	NTSTATUS status = PsLookupThreadByThreadId(PsGetCurrentThreadId(), &thread);
+	if (!NT_SUCCESS(status)) {
+		ExFreePoolWithTag(contextinfo, 'CTXT');
+		KdPrint(("Error: Failed to lookup thread (0x%08X)\n", status));
+		return status;
+	}
+	ObReferenceObject(thread);//safe way to get the thread that is working on the IRP. This was buggy before, as if the thread exits before CompletionRoutine does, it'll do a BSOD (referencing a dead thread).
 	contextinfo->oldprio = KeQueryPriorityThread(thread);//fetches current priority
 	contextinfo->thread = thread; //sets the thread that is working on the IRP as the one we will modify.
 	KeSetPriorityThread(thread, HIGH_PRIORITY); //sets the thread's priority to HIGH. this should speed up IRP processing.
@@ -109,7 +115,7 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 	//This is necessary, as the completion routine (and what's written in here) is what implements the necessary modifications to reduce input lag. 
 	//it also sends the oldprio as context, which is necessary in order to return the thread to it's regular priority. 
 
-	status = IoCallDriver(deviceExtension->LowerDeviceObject, irp); //calls the driver for the keyboard with the IRP that 
+	status = IoCallDriver(deviceExtension->LowerDeviceObject, irp); //calls the driver for the keyboard with the IRP that I intercepted.
 	/*
 	* if (!NT_SUCCESS(status) && status != STATUS_PENDING) { //checks if status is not pending and that it's successful.
 	*	
@@ -142,14 +148,14 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 NTSTATUS DeviceAttach(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT ActualKeyboard) //automatically called by the PNP Manager when it wants to add the device.
 { // For USB polling: Attach as upper filter to hidusb.sys to intercept URBs (embedded in IRPs).  
   // Goal: Reduce OS scheduling delay between URB completion and input delivery.  
-  // Note: USB poll interval (bInterval) may limit minimum latency.  
+  // Note: USB poll interval may limit minimum latency.  
 
 	NTSTATUS status = STATUS_SUCCESS; //initialize the status variable we will use.
 
 	PDEVICE_OBJECT filter = NULL;
 	PDEVICE_OBJECT LowerDeviceObject = NULL;
-	UNICODE_STRING devname = RTL_CONSTANT_STRING(L"\\Device\\latop");
-	status = IoCreateDevice(DriverObject, sizeof(DEVICE_EXTENSION), &devname, ActualKeyboard->DeviceType, 0, FALSE, &filter);
+	
+	status = IoCreateDevice(DriverObject, sizeof(DEVICE_EXTENSION), NULL, ActualKeyboard->DeviceType, 0, FALSE, &filter);
 	if (!NT_SUCCESS(status)) {
 
 		KdPrint(("Failed to create device Object (0x%08X)\n", status));
@@ -160,6 +166,7 @@ NTSTATUS DeviceAttach(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT ActualKeyboard
 	filter->Flags |= DO_BUFFERED_IO;//DO_BUFFERED_IO:windows will copy data between usermode and a kernel buffer, making it easier to safely access user input. This helps reduce latency by minimizing the time spent on memory operations.
 	//using OR bitwise operator here. this is because the filter Device may have flags that are already set.
 	// we don't want to lose those, as they may- and probably are- crucial.
+	
 	status = IoAttachDeviceToDeviceStackSafe(filter, ActualKeyboard, &LowerDeviceObject);
 	if (!NT_SUCCESS(status)) {
 		IoDeleteDevice(filter);//this is in case it fails to attach itself to the DeviceStack of the keyboard. we still want to free the memory, so no leaks happen!
@@ -167,8 +174,8 @@ NTSTATUS DeviceAttach(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT ActualKeyboard
 		//dont forget to delete symlink when I remember to initialize it lmao
 		return status;
 	}
-	deviceExtension->LowerDeviceObject = LowerDeviceObject; //LowerDeviceObject is a necessary extension, as I may want to pass down IRPs in the stack.
-
+	deviceExtension->LowerDeviceObject = LowerDeviceObject;
+	filter->StackSize = LowerDeviceObject->StackSize + 1; //so filter.stack never runs out of space.
 	return status;
 }
 
@@ -189,8 +196,8 @@ NTSTATUS CompletionRoutine(PDEVICE_OBJECT DeviceObject, PIRP irp, PVOID Context)
 	* significantly increase overhead. This is solved by using KeSetSystemAffinityThread, which forces the thread to remain on a specific CPU Core.
 	* As such, there is less overhead, and therefore less input-lag.
 	*
-	* TODO: Once I'm more skilled in driver development, I plan on implementing either DMA, IRP Batching(this syncs well with minimising context switches),
-	* or Kernel Bypassing techniques.
+	* TODO: Once I'm more skilled in driver development, I plan on implementing either IRP batching, or USB Polling through URB_....; this should considerably reduce 
+	* input latency; moreso than thread pining, and modifying thread priority. 
 	*/
 
 
