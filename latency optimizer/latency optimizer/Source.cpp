@@ -1,8 +1,19 @@
 #include <ntddk.h>
 #include <dontuse.h>
-#include <ntifs.h>
 
-//NOTE: NO SYMBOLIC LINK YET. THIS DRIVER IS STILL IN DEVELOPMENT. 
+/*
+* this is where the magic happens.In order to lower inputlag, this driver will do 2 things, one active one passive.
+*
+* 1. Temporary thread boosting(ACTIVE): This will be done by fetching the thread where the LowerDeviceObject resides,
+* and temporarily increasing its priority to "HIGH". After processing the IRP request, the thread's priority will be lowered back
+* down to "NORMAL", in order to avoid deadlocks, starvation, resource hogging, while improving stability and actually reducing input lag.
+* 2. minimal context switches(Passive): Context switches occur when the CPU switches from executing one thread to another, which may
+* significantly increase overhead. This is solved by using KeSetSystemAffinityThread, which forces the thread to remain on a specific CPU Core.
+* As such, there is less overhead, and therefore less input-lag.
+*
+* TODO: Once I'm more skilled in driver development, I plan on implementing either IRP batching, or USB Polling through URB_....; this should considerably reduce
+* input latency; moreso than thread pining, and modifying thread priority.
+*/
 void latopUnload(PDRIVER_OBJECT DriverObject);
 NTSTATUS PassThru(PDEVICE_OBJECT DeviceObject, PIRP irp);
 NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp);
@@ -24,7 +35,7 @@ typedef struct _MY_COMPLETION_CONTEXT {
 
 extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING registrypath) { //FINISHED
 	NTSTATUS status = STATUS_SUCCESS;
-
+	UNREFERENCED_PARAMETER(registrypath);
 
 
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = PassThru; //IRP_MJ_CREATE and IRP_MJ_CLOSE will operate the same way, 
@@ -71,8 +82,17 @@ NTSTATUS PassThru(PDEVICE_OBJECT DeviceObject, PIRP irp) {//FINISHED
 
 NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 {
+	PDEVICE_EXTENSION deviceExtension = (PDEVICE_EXTENSION)DeviceObject->DeviceExtension; //sets the device extension param that ill need in order to fetch the lowerdeviceobject from the stack.
 
-	
+	PIO_STACK_LOCATION stackLocation = IoGetCurrentIrpStackLocation(irp); //fetches the current stack location for the process. 
+	//validates IRP parameters, to ensure they're not null, so no BSODs happen.
+	if (!irp || !stackLocation || !deviceExtension->LowerDeviceObject) {
+		KdPrint(("Error: Invalid irp (0x%08X)\n", STATUS_INVALID_PARAMETER));
+
+		return STATUS_INVALID_PARAMETER;
+
+
+	}
 	//initiates a contextinfo struct, which contains oldaffinity, oldpriority and the targetted thread. this will be passed to "IoSetCompletionRoutine" as the "context" argument.
 	PMY_COMPLETION_CONTEXT contextinfo = (PMY_COMPLETION_CONTEXT)ExAllocatePoolWithTag(NonPagedPool, sizeof(MY_COMPLETION_CONTEXT), 'CTXT'); //allocates memory from the non-paged memory pool corresponding to the size of my struct. 
 	//contextinfo will be passed as the "context" argument in IoSetCompletionRoutine; 
@@ -80,34 +100,20 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 		KdPrint(("Error: Failed to allocate memory\n"));
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
-	PKTHREAD thread;
-	NTSTATUS status = PsLookupThreadByThreadId(PsGetCurrentThreadId(), &thread);
-	if (!NT_SUCCESS(status)) {
+	PETHREAD thread = PsGetCurrentThread();
+	if (!thread) {
 		ExFreePoolWithTag(contextinfo, 'CTXT');
-		KdPrint(("Error: Failed to lookup thread (0x%08X)\n", status));
-		return status;
+		KdPrint(("Error: Failed to lookup thread."));
+		return STATUS_THREADPOOL_HANDLE_EXCEPTION;
 	}
 	ObReferenceObject(thread);//safe way to get the thread that is working on the IRP. This was buggy before, as if the thread exits before CompletionRoutine does, it'll do a BSOD (referencing a dead thread).
-	contextinfo->oldprio = KeQueryPriorityThread(thread);//fetches current priority
-	contextinfo->thread = thread; //sets the thread that is working on the IRP as the one we will modify.
-	KeSetPriorityThread(thread, HIGH_PRIORITY); //sets the thread's priority to HIGH. this should speed up IRP processing.
+	
+
+	contextinfo->oldprio = KeQueryPriorityThread((PKTHREAD)thread);//fetches current priority
+	contextinfo->thread = (PKTHREAD)thread; //sets the thread that is working on the IRP as the one we will modify.
+	KeSetPriorityThread((PKTHREAD)thread, HIGH_PRIORITY); //sets the thread's priority to HIGH. this should speed up IRP processing.
 	contextinfo->oldaffinity = KeSetSystemAffinityThreadEx(0x1); //Ensures IRP runs on CPU 0. This removes context switching, which reduces latency.  
-
-	NTSTATUS status = STATUS_SUCCESS;
-	PDEVICE_EXTENSION deviceExtension = (PDEVICE_EXTENSION)DeviceObject->DeviceExtension; //sets the device extension param that ill need in order to fetch the lowerdeviceobject from the stack.
-
-	PIO_STACK_LOCATION stackLocation = IoGetCurrentIrpStackLocation(irp); //fetches the current stack location for the process. 
-
-	//validate IRP and parameters, to ensure validity of inputs
-	if (!irp || !stackLocation || !deviceExtension->LowerDeviceObject) {
-		KdPrint(("Error: Invalid irp (0x%08X)\n", STATUS_INVALID_PARAMETER));
-
-		KeSetPriorityThread(thread, contextinfo->oldprio); //restores the old priority in case of failure.
-		KeRevertToUserAffinityThreadEx(contextinfo->oldaffinity); //restores the old affinity in case of failure.
-		ExFreePoolWithTag(contextinfo, 'CTXT'); //frees pool, as there's an error. prevents memory leak.
-		return STATUS_INVALID_PARAMETER;
-
-	}
+	
 	//copies the IRP intercepted by my DeviceObject (filter), and sends a copy of it to LowerDeviceObject (DeviceObject of the physical keyboard).
 	IoCopyCurrentIrpStackLocationToNext(irp);
 
@@ -115,34 +121,10 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 	//This is necessary, as the completion routine (and what's written in here) is what implements the necessary modifications to reduce input lag. 
 	//it also sends the oldprio as context, which is necessary in order to return the thread to it's regular priority. 
 
-	status = IoCallDriver(deviceExtension->LowerDeviceObject, irp); //calls the driver for the keyboard with the IRP that I intercepted.
-	/*
-	* if (!NT_SUCCESS(status) && status != STATUS_PENDING) { //checks if status is not pending and that it's successful.
-	*	
-	*	irp->IoStatus.Status = status;
-	*	irp->IoStatus.Information = 0;
-	*	IoCompleteRequest(irp, IO_NO_INCREMENT);
-	*
-	*	KeSetPriorityThread(thread, contextinfo->oldprio); //restores the old priority in case of failure.
-	*	KeRevertToUserAffinityThreadEx(contextinfo->oldaffinity); //restores the old affinity in case of failure.
-	*	ExFreePoolWithTag(contextinfo, 'CTXT'); //frees pool, as there's an error. prevents memory leak.
-	*	KdPrint(("Error: invalid irp: (0x%08X)\n", status));
-	*	return status;
-	*}
-	* 
-	* The above code block is useless. we don't really care what happens if IoCallDriver fails, because it's literally none of our business. 
-	* if it fails, we return status and move on. The cleanup won't be done here, but it will be done in the CompletionRoutine. 
-	* if it succeeds, we dont do anything.
-	* if it's hanging, it's also out of our hands. 
-	* 
-	* 
-	* 
-	* 
-	* 
-	*/
-
-
-	return status;
+	NTSTATUS status = IoCallDriver(deviceExtension->LowerDeviceObject, irp); //calls the driver for the keyboard with the IRP that I intercepted.
+	
+	return STATUS_CONTINUE_COMPLETION;//this is necessary in order to make sure that the Completion Routine gets to see the completed IRP before it is terminated;
+	//i'm using the completion routine in order to "revert" the thread priority & remove the thread pin on CORE 0.
 }
 
 NTSTATUS DeviceAttach(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT ActualKeyboard) //automatically called by the PNP Manager when it wants to add the device.
@@ -175,36 +157,27 @@ NTSTATUS DeviceAttach(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT ActualKeyboard
 		return status;
 	}
 	deviceExtension->LowerDeviceObject = LowerDeviceObject;
-	filter->StackSize = LowerDeviceObject->StackSize + 1; //so filter.stack never runs out of space.
+	filter->StackSize = LowerDeviceObject->StackSize;//;) No +1 cuz its filter
 	return status;
 }
 
 NTSTATUS CompletionRoutine(PDEVICE_OBJECT DeviceObject, PIRP irp, PVOID Context)
 {
-
+	UNREFERENCED_PARAMETER(irp);
 	UNREFERENCED_PARAMETER(DeviceObject);
 	UNREFERENCED_PARAMETER(Context);
 
 	KdPrint(("Completion Routine called. \n"));
-	/*
-	* this is where the magic happens.In order to lower inputlag, this completion routine will do 2 things, one active one passive.
-	*
-	* 1. Temporary thread boosting(ACTIVE): This will be done by fetching the thread where the LowerDeviceObject resides,
-	* and temporarily increasing its priority to "HIGH". After processing the IRP request, the thread's priority will be lowered back
-	* down to "NORMAL", in order to avoid deadlocks, starvation, resource hogging, while improving stability and actually reducing input lag.
-	* 2. minimal context switches(Passive): Context switches occur when the CPU switches from executing one thread to another, which may
-	* significantly increase overhead. This is solved by using KeSetSystemAffinityThread, which forces the thread to remain on a specific CPU Core.
-	* As such, there is less overhead, and therefore less input-lag.
-	*
-	* TODO: Once I'm more skilled in driver development, I plan on implementing either IRP batching, or USB Polling through URB_....; this should considerably reduce 
-	* input latency; moreso than thread pining, and modifying thread priority. 
-	*/
+
 
 
 	//used to identify the thread handling the keyboard input, to restore its priority.
 	PMY_COMPLETION_CONTEXT oldinfo = (PMY_COMPLETION_CONTEXT)Context; //typecasting PVOID context to PMY_COMPLETION_CONTEXT.
-	KeSetPriorityThread(oldinfo->thread, oldinfo->oldprio);//restores the old prio to the thread.
-	KeRevertToUserAffinityThreadEx(oldinfo->oldaffinity);//restores the old affinity of the thread.
+	PKTHREAD currentThread = (PKTHREAD)PsGetCurrentThread();//this and the if currentthread==oldinfo->thread is just security. just in case the thread switc
+	if (currentThread == oldinfo->thread) {
+		KeSetPriorityThread(currentThread, oldinfo->oldprio);
+		KeRevertToUserAffinityThreadEx(oldinfo->oldaffinity);
+	}
 	ObDereferenceObject(oldinfo->thread);
 	ExFreePoolWithTag(oldinfo, 'CTXT');//frees the paged memory pool.
 	return STATUS_SUCCESS;

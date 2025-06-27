@@ -1,0 +1,4 @@
+﻿  Building 'latency optimizer' with toolset 'WindowsKernelModeDriver10.0' and the 'Desktop' target platform.
+  Source.cpp
+V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\latency optimizer\Source.cpp(86,63): error C2220: the following warning is treated as an error
+V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\latency optimizer\Source.cpp(86,63): warning C4996: 'ExAllocatePoolWithTag': ExAllocatePoolWithTag is deprecated, use ExAllocatePool2.

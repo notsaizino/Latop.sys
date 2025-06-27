@@ -4,10 +4,10 @@
 
 [Version]
 Signature="$WINDOWS NT$"
-Class=System
-ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318}
+Class= Keyboard
+ClassGuid={4D36E96B-E325-11CE-BFC1-08002BE10318}
 Provider=%ManufacturerName%
-DriverVer=
+DriverVer= 06/27/2025, 1.0.0.0
 CatalogFile=latencyoptimizer.cat
 PnpLockdown=1
 
