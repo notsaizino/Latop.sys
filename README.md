@@ -62,9 +62,7 @@ These latency reductions demonstrate that real-time thread shaping can impact ke
 ## 🔧 Build Instructions
 
 1. Open the `.vcxproj` in Visual Studio with WDK 10.0+ installed.
-2. Select `x64 Release` configuration.
-3. Build the driver.
-4. Load using `OSRLoader`, bcdedit test-signing, or manual SCM installation.
+2. Build & Run. *Note: Do not use the config file, I have no idea how to make it work. Sorry! :P
 
 ---
 
@@ -82,6 +80,10 @@ These latency reductions demonstrate that real-time thread shaping can impact ke
 
 This is my first driver ever, so I had no idea how to run it or test it. It was very hard. But, I made it through! :D
 🎆
+
+This project is for educational and reference purposes only. 
+You may not redistribute or claim this code as your own.
+
 
 ---
 
