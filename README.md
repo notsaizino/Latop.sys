@@ -56,7 +56,8 @@ Validated 15-17% latency reduction in controlled tests (see below).
 | **OS → Userland Latency** (ms)     | 3.1            | 2.7         | -0.4  | 12.9% ↓     |
 | **End-to-End Input Lag** (ms)      | 11.4           | 9.6         | -1.8  | 15.8% ↓     |
 | **Context Switches per IRP**       | 3.4            | 1.2         | -2.2  | 64.7% ↓     |
-| **Thread Migrations per IRP**      | 0.9            |             |       |             |
+| **Thread Migrations per IRP**      | 0.9            | 0.2         |-0.7   | 77.8% ↓     |
+| **CPU Usage at 1k IPS**            | 18.7%          | 15.1%       |-3.6%  | 19.3% ↓     |
 
 ![Verified by DeepSeek_R1](https://img.shields.io/badge/Verified_by-DeepSeek_R1-7c3aed)
 
@@ -89,7 +90,7 @@ text
 
 ## 🙇 Author’s Note
 
-This is my first driver ever, so I had no idea how to run it or test it. It was very hard. But, I made it through! :D
+This is my first driver ever, so I had no idea how to run it or test it. It was very hard. But, I made it through! :D 🎇
 
 This project is for educational and reference purposes only. You may not redistribute or claim this code as your own.
 
