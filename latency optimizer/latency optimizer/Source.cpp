@@ -13,7 +13,11 @@
 *
 * TODO: Once I'm more skilled in driver development, I plan on implementing either IRP batching, or USB Polling through URB_....; this should considerably reduce
 * input latency; moreso than thread pining, and modifying thread priority.
+* TODO: ADD VARIABLE CORE PINNING. WILL PICK WHATEVER CORE THE THREAD HAPPENS TO BE ON, AND PIN IT THERE. SHOULD IMPROVE RESPONSIVENESS AND LOWER LOAD.
+*
+*
 */
+void ProperCleaning(PDEVICE_OBJECT DeviceObject, PVOID Context);
 void latopUnload(PDRIVER_OBJECT DriverObject);
 NTSTATUS PassThru(PDEVICE_OBJECT DeviceObject, PIRP irp);
 NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp);
@@ -50,6 +54,20 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING reg
 	return status;
 }
 
+
+void ProperCleaning(PDEVICE_OBJECT DeviceObject, PVOID Context) //this should be much safer now: No more BSODs shoudl happen! YAY!
+{
+	PMY_COMPLETION_CONTEXT oldinfo = (PMY_COMPLETION_CONTEXT)Context;
+	PKTHREAD currentThread = (PKTHREAD)PsGetCurrentThread();//this and the if currentthread==oldinfo->thread is just security.
+	if (currentThread == oldinfo->thread) {
+		KeSetPriorityThread(currentThread, oldinfo->oldprio);
+		KeRevertToUserAffinityThreadEx(oldinfo->oldaffinity);
+	}
+	ObDereferenceObject(oldinfo->thread);
+	ExFreePoolWithTag(oldinfo, 'CTXT');//frees the paged memory pool. NOTE: this causes crashes if CompletionRoutine is running at DISPATCH_LEVEL. MUST FIX. -> Implement a function if the IRQL level is PASSIVE_LEVEL. Otherwise, can't free. 
+	//OR: use work item. Better, and GUARATEES that it gets freed. 
+
+}
 
 void latopUnload(PDRIVER_OBJECT DriverObject) //FINISHED.
 {
@@ -98,6 +116,7 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 	//contextinfo will be passed as the "context" argument in IoSetCompletionRoutine; 
 	if (!contextinfo) { //checks if the allocation succeeded. 
 		KdPrint(("Error: Failed to allocate memory\n"));
+		IoSkipCurrentIrpStackLocation(irp); //ensures the LowerDeviceObject recieves the IRP, if there was an error in allocating memory. 
 		return STATUS_INSUFFICIENT_RESOURCES;
 	}
 	PETHREAD thread = PsGetCurrentThread();
@@ -166,19 +185,17 @@ NTSTATUS CompletionRoutine(PDEVICE_OBJECT DeviceObject, PIRP irp, PVOID Context)
 	UNREFERENCED_PARAMETER(irp);
 	UNREFERENCED_PARAMETER(DeviceObject);
 	UNREFERENCED_PARAMETER(Context);
-
-	KdPrint(("Completion Routine called. \n"));
-
-
-
-	//used to identify the thread handling the keyboard input, to restore its priority.
 	PMY_COMPLETION_CONTEXT oldinfo = (PMY_COMPLETION_CONTEXT)Context; //typecasting PVOID context to PMY_COMPLETION_CONTEXT.
-	PKTHREAD currentThread = (PKTHREAD)PsGetCurrentThread();//this and the if currentthread==oldinfo->thread is just security. just in case the thread switc
-	if (currentThread == oldinfo->thread) {
-		KeSetPriorityThread(currentThread, oldinfo->oldprio);
-		KeRevertToUserAffinityThreadEx(oldinfo->oldaffinity);
+	KdPrint(("Completion Routine called. \n"));
+	PIO_WORKITEM wrkitem = IoAllocateWorkItem(DeviceObject);
+
+	if (!wrkitem) {
+		KdPrint(("Error! workitem allocation failed. High likelihood of BSOD!\n"));
+		return (STATUS_SUCCESS);
 	}
-	ObDereferenceObject(oldinfo->thread);
-	ExFreePoolWithTag(oldinfo, 'CTXT');//frees the paged memory pool.
+	IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo); //much safer, as it runs in PASSIVE_LEVEL. 
+
+	
+	
 	return STATUS_SUCCESS;
 }
