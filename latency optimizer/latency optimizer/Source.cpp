@@ -13,7 +13,7 @@
 *
 * TODO: Once I'm more skilled in driver development, I plan on implementing either IRP batching, or USB Polling through URB_....; this should considerably reduce
 * input latency; moreso than thread pining, and modifying thread priority.
-* TODO: ADD VARIABLE CORE PINNING. WILL PICK WHATEVER CORE THE THREAD HAPPENS TO BE ON, AND PIN IT THERE. SHOULD IMPROVE RESPONSIVENESS AND LOWER LOAD.
+* DONE: ADD VARIABLE CORE PINNING. WILL PICK WHATEVER CORE THE THREAD HAPPENS TO BE ON, AND PIN IT THERE. SHOULD IMPROVE RESPONSIVENESS AND LOWER LOAD.
 *
 *
 */
@@ -114,6 +114,7 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 	//initiates a contextinfo struct, which contains oldaffinity, oldpriority and the targetted thread. this will be passed to "IoSetCompletionRoutine" as the "context" argument.
 	PMY_COMPLETION_CONTEXT contextinfo = (PMY_COMPLETION_CONTEXT)ExAllocatePoolWithTag(NonPagedPool, sizeof(MY_COMPLETION_CONTEXT), 'CTXT'); //allocates memory from the non-paged memory pool corresponding to the size of my struct. 
 	//contextinfo will be passed as the "context" argument in IoSetCompletionRoutine; 
+	//apparently, NonPagedPoolNx is the new meta (instead of NonPagedPool). Idk much about this, but I'll still leave it as NonPagedPool. I dont want to put something Idk about.
 	if (!contextinfo) { //checks if the allocation succeeded. 
 		KdPrint(("Error: Failed to allocate memory\n"));
 		IoSkipCurrentIrpStackLocation(irp); //ensures the LowerDeviceObject recieves the IRP, if there was an error in allocating memory. 
@@ -131,8 +132,13 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 	contextinfo->oldprio = KeQueryPriorityThread((PKTHREAD)thread);//fetches current priority
 	contextinfo->thread = (PKTHREAD)thread; //sets the thread that is working on the IRP as the one we will modify.
 	KeSetPriorityThread((PKTHREAD)thread, HIGH_PRIORITY); //sets the thread's priority to HIGH. this should speed up IRP processing.
-	contextinfo->oldaffinity = KeSetSystemAffinityThreadEx(0x1); //Ensures IRP runs on CPU 0. This removes context switching, which reduces latency.  
 	
+	ULONG currentcore = KeGetCurrentProcessorNumber();//fetches the current CORE the thread is on. Should be more dynamic, and reduce load on CORE0.
+	KAFFINITY affinityMask = (KAFFINITY)(1 << currentcore); //this transforms the currentcore ULONG into a bitmask representing the core index in currentcore.
+	//note: we must shift it towards the left, as 0x1 and 0x0 = 1. 0x0 doesn't even exist. //this is like a small edge case. but it ensures everything works smoothly!
+	contextinfo->oldaffinity = KeSetSystemAffinityThreadEx(affinityMask); //Ensures IRP runs on a single CORE, to fully reduce context switching. Even though it says "KeSET", 
+	//this function returns the OLD affinity of the thread. Amazingly useful.
+	//This removes context switching, which reduces latency.  
 	//copies the IRP intercepted by my DeviceObject (filter), and sends a copy of it to LowerDeviceObject (DeviceObject of the physical keyboard).
 	IoCopyCurrentIrpStackLocationToNext(irp);
 
@@ -143,7 +149,7 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 	NTSTATUS status = IoCallDriver(deviceExtension->LowerDeviceObject, irp); //calls the driver for the keyboard with the IRP that I intercepted.
 	
 	return STATUS_CONTINUE_COMPLETION;//this is necessary in order to make sure that the Completion Routine gets to see the completed IRP before it is terminated;
-	//i'm using the completion routine in order to "revert" the thread priority & remove the thread pin on CORE 0.
+	//i'm using the completion routine in order to "revert" the thread priority & remove the thread pin on the CORE the thread was pinned. .
 }
 
 NTSTATUS DeviceAttach(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT ActualKeyboard) //automatically called by the PNP Manager when it wants to add the device.
