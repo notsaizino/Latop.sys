@@ -84,7 +84,8 @@ Validated 15-17% latency reduction in controlled tests (see below).
 | **Thread Migrations/IRP**     | 0.87  | 0.08     | –90.8% |
 | **CPU Utilization**           | 15.3% | 10.2%    | –33.3% |
 ------------------------------------------------------------
----![Verified by DeepSeek_R1](https://img.shields.io/badge/Verified_by-DeepSeek_R1-7c3aed)
+---
+![Verified by DeepSeek_R1](https://img.shields.io/badge/Verified_by-DeepSeek_R1-7c3aed)
 
 
 ### Statistical Significance
@@ -94,10 +95,10 @@ Validated 15-17% latency reduction in controlled tests (see below).
 
 ### Key Findings
 - **Old Hardware:**  
-  - 29–34% latency reduction by improving cache hits and avoiding NUMA penalties  
+  - 29–34% latency reduction
   - Priority boosting yielded ~22% effective clock‑speed gain  
 - **New Hardware:**  
-  - ~15–18% latency reduction; diminishing returns due to low L3 latency and high memory bandwidth  
+  - ~15–18% latency reduction; 
   - Driver kept CPU ~7 °C cooler under load, avoiding thermal throttling  
 
 _All results independently verified by DeepSeek R1 under consistent load._
