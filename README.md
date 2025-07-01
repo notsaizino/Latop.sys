@@ -18,16 +18,15 @@ This design reduces context switching and improves input dispatch latency—crit
 ## 🧠 Technical Highlights
 
 - **Thread Latency Optimization:**  
-  Elevates thread responsiveness via `KeSetPriorityThread` and eliminates cross-core scheduling overhead by pinning the thread to CPU core 0 only:
-KeSetSystemAffinityThreadEx(0x1); // Core 0
+  Elevates thread responsiveness via `KeSetPriorityThread` and eliminates cross-core scheduling overhead by dynamically pinning the thread to its current core.
+KeSetSystemAffinityThreadEx(affinityMask);
 
-text
+
 
 - **IRP Lifecycle Management:**  
 Full passthrough IRP handling with completion routine safety via work items:
 IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo);
 
-text
 
 - **Benchmark-Proven Performance:**  
 Validated 15-17% latency reduction in controlled tests (see below).
@@ -85,7 +84,8 @@ Validated 15-17% latency reduction in controlled tests (see below).
 | **Thread Migrations/IRP**     | 0.87  | 0.08     | –90.8% |
 | **CPU Utilization**           | 15.3% | 10.2%    | –33.3% |
 ------------------------------------------------------------
----
+---![Verified by DeepSeek_R1](https://img.shields.io/badge/Verified_by-DeepSeek_R1-7c3aed)
+
 
 ### Statistical Significance
 - **All p‑values < 0.000001** → 99.9999% confidence in measured improvements
@@ -99,7 +99,6 @@ Validated 15-17% latency reduction in controlled tests (see below).
 - **New Hardware:**  
   - ~15–18% latency reduction; diminishing returns due to low L3 latency and high memory bandwidth  
   - Driver kept CPU ~7 °C cooler under load, avoiding thermal throttling  
-![Verified by DeepSeek_R1](https://img.shields.io/badge/Verified_by-DeepSeek_R1-7c3aed)
 
 _All results independently verified by DeepSeek R1 under consistent load._
 
@@ -122,8 +121,6 @@ _All results independently verified by DeepSeek R1 under consistent load._
 **Install:**
 sc create latop type= kernel binPath= C:\Path\to\latop.sys
 sc start latop
-
-text
 
 ---
 
