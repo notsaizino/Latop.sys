@@ -95,14 +95,7 @@ _Simulated values using DeepSeek R1 based on optimization techniques implemented
 ---
 
 ## 🔧 Build & Installation
-
-1. Open `.vcxproj` in Visual Studio with WDK 10.0+
-2. Build for x64 Release
-3. Sign with test certificate or disable enforcement
-
-**Install:**
-sc create latop type= kernel binPath= C:\Path\to\latop.sys
-sc start latop
+Unbuildable due to .ini issues.
 
 ---
 
