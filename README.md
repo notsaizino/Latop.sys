@@ -25,6 +25,9 @@ KeSetSystemAffinityThreadEx(affinityMask);
 Full passthrough IRP handling with completion routine safety via work items:
 IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo);
 
+- **Robust Cancellation Handling:**  
+  Implements a cancel routine that safely handles IRP cancellations by queuing cleanup work items, preventing crashes caused by freeing resources at high IRQL.
+  
 - **Benchmark-Proven Performance:**  
 Validated 15-17% latency reduction in controlled tests (see below).
 
