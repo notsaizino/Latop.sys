@@ -1,0 +1,4 @@
+﻿  Building 'latency optimizer' with toolset 'WindowsKernelModeDriver10.0' and the 'Desktop' target platform.
+  Stamping x64\Release\latencyoptimizer.inf
+  Stamping [Version] section with DriverVer=07/10/2025,12.25.13.560
+V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\latency optimizer\latencyoptimizer.inf : error 1297: Device driver does not install on any devices, use primitive driver if this is intended.

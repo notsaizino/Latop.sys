@@ -1,6 +1,10 @@
 #include <ntddk.h>
 #include <dontuse.h>
+/*
+Will have to implement a PNP major function override
 
+
+*/
 /*
 * this is where the magic happens.In order to lower inputlag, this driver will do 2 things, one active one passive.
 *
@@ -17,6 +21,7 @@
 *
 *
 */
+void Cancelroutine(PDEVICE_OBJECT DeviceObject, PIRP irp);
 void ProperCleaning(PDEVICE_OBJECT DeviceObject, PVOID Context);
 void latopUnload(PDRIVER_OBJECT DriverObject);
 NTSTATUS PassThru(PDEVICE_OBJECT DeviceObject, PIRP irp);
@@ -34,6 +39,7 @@ typedef struct _MY_COMPLETION_CONTEXT {
 	KPRIORITY oldprio;
 	KAFFINITY oldaffinity;
 	PKTHREAD thread; //passes the thread with the modified priority.
+	PIO_WORKITEM workItem; //Passes the work item so I can free it in ProperCleaning.
 } MY_COMPLETION_CONTEXT, * PMY_COMPLETION_CONTEXT;
 
 
@@ -54,6 +60,32 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING reg
 	return status;
 }
 
+/*
+Routine that is called when the IRP Is cancelled. this is basically the same as my completion routine, but with extra steps. 
+i queue a work item, so that i can clean up the code nicely. ill just reuse the ProperCleaning method (the work item routine that i use to cleanup)
+to be the same as the one my completion routine.
+*/
+void Cancelroutine( PDEVICE_OBJECT deviceObject,PIRP irp)
+{
+	
+	PMY_COMPLETION_CONTEXT oldinfo = (PMY_COMPLETION_CONTEXT) irp->Tail.Overlay.DriverContext[0]; //sets the context pointer back to PMY_COMPLETION_CONTEXT type.
+	KdPrint(("Cancel Routine called. \n"));
+	PIO_WORKITEM wrkitem = IoAllocateWorkItem(deviceObject); //allocates work item to defer cleanup of allocated paged mem pool.
+	irp->IoStatus.Status = STATUS_CANCELLED; //sets the status of the IRP.
+	irp->IoStatus.Information = 0; //no extra information.
+	if (!wrkitem) {
+		KdPrint(("Error! workitem allocation failed. High likelihood of BSOD!\n"));
+		
+	}
+	else { //its ugly, but it works. i have to throw the workitem stuff here, since cancelroutines return void. sorry it's so ugly, but it is what it is.
+		oldinfo->workItem = wrkitem;
+		IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo); //cleanup routine using a work item to ensure it runs in PASSIVE_LEVEL. 
+	}
+	
+	IoReleaseCancelSpinLock(irp->CancelIrql); //required so the system frees the spinlock used for the cancellation routine.
+	IoCompleteRequest(irp, IO_NO_INCREMENT);
+
+}
 
 void ProperCleaning(PDEVICE_OBJECT DeviceObject, PVOID Context) //this should be much safer now: No more BSODs shoudl happen! YAY!
 {
@@ -64,6 +96,11 @@ void ProperCleaning(PDEVICE_OBJECT DeviceObject, PVOID Context) //this should be
 		KeRevertToUserAffinityThreadEx(oldinfo->oldaffinity);
 	}
 	ObDereferenceObject(oldinfo->thread);
+	
+	if (oldinfo->workItem) {
+		IoFreeWorkItem(oldinfo->workItem);
+		oldinfo->workItem = NULL;
+	}
 	ExFreePoolWithTag(oldinfo, 'CTXT');//frees the paged memory pool. NOTE: this causes crashes if CompletionRoutine is running at DISPATCH_LEVEL. MUST FIX. -> Implement a function if the IRQL level is PASSIVE_LEVEL. Otherwise, can't free. 
 	//OR: use work item. Better, and GUARATEES that it gets freed. 
 
@@ -71,7 +108,7 @@ void ProperCleaning(PDEVICE_OBJECT DeviceObject, PVOID Context) //this should be
 
 void latopUnload(PDRIVER_OBJECT DriverObject) //FINISHED.
 {
-
+	//implement KeWaitForSingleObject to ensure that the work item isn't being done while we exit. might have to implement a new struct for it.
 	PDEVICE_OBJECT filter = DriverObject->DeviceObject; //my device object.
 	while (filter != NULL) {// ill use a while loop to clear all the driver extensions that may be in the stack, just in case. 
 		PDEVICE_EXTENSION devext = (PDEVICE_EXTENSION)(filter->DeviceExtension);
@@ -145,6 +182,9 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 	IoSetCompletionRoutine(irp, CompletionRoutine, (PVOID)contextinfo, TRUE, TRUE, TRUE);//sets the completion routine to the one I defined. 
 	//This is necessary, as the completion routine (and what's written in here) is what implements the necessary modifications to reduce input lag. 
 	//it also sends the oldprio as context, which is necessary in order to return the thread to it's regular priority. 
+	irp->Tail.Overlay.DriverContext[0] = (PVOID)contextinfo; //sets the pointer of the context info to the DriverContext array entry (specifically 0). i don't like that it's hardcoded, ill have to 
+	//read into this later and fix it up/set it up in a better, nicer more elegant way.
+	IoSetCancelRoutine(irp, Cancelroutine); //sets the cancel routine (in case the irp is cancelled). for this, we must set the irp->tail.overlay.drivercontext[0] to my pvoid pointer of the struct.
 
 	NTSTATUS status = IoCallDriver(deviceExtension->LowerDeviceObject, irp); //calls the driver for the keyboard with the IRP that I intercepted.
 	
@@ -168,6 +208,7 @@ NTSTATUS DeviceAttach(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT ActualKeyboard
 		KdPrint(("Failed to create device Object (0x%08X)\n", status));
 		return status;
 	}
+	DriverObject->DeviceObject = filter;
 	PDEVICE_EXTENSION deviceExtension = (PDEVICE_EXTENSION)filter->DeviceExtension;
 	filter->Flags &= ~DO_DEVICE_INITIALIZING; //in order for DO_DEVICE_INITIALIZING not to clear all flags in order to initialize, we do a AND and a NOT on the flag that represents "DO_DEVICE_INITIALIZING" in order to clear it.
 	filter->Flags |= DO_BUFFERED_IO;//DO_BUFFERED_IO:windows will copy data between usermode and a kernel buffer, making it easier to safely access user input. This helps reduce latency by minimizing the time spent on memory operations.
@@ -190,15 +231,17 @@ NTSTATUS CompletionRoutine(PDEVICE_OBJECT DeviceObject, PIRP irp, PVOID Context)
 {
 	UNREFERENCED_PARAMETER(irp);
 	UNREFERENCED_PARAMETER(DeviceObject);
-	UNREFERENCED_PARAMETER(Context);
+	
 	PMY_COMPLETION_CONTEXT oldinfo = (PMY_COMPLETION_CONTEXT)Context; //typecasting PVOID context to PMY_COMPLETION_CONTEXT.
+	
 	KdPrint(("Completion Routine called. \n"));
 	PIO_WORKITEM wrkitem = IoAllocateWorkItem(DeviceObject);
-
+	
 	if (!wrkitem) {
 		KdPrint(("Error! workitem allocation failed. High likelihood of BSOD!\n"));
 		return (STATUS_SUCCESS);
 	}
+	oldinfo->workItem = wrkitem;
 	IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo); //much safer, as it runs in PASSIVE_LEVEL. 
 
 	

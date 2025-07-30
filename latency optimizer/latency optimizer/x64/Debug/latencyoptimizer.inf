@@ -7,7 +7,7 @@ Signature="$WINDOWS NT$"
 Class= Keyboard
 ClassGuid={4D36E96B-E325-11CE-BFC1-08002BE10318}
 Provider=%ManufacturerName%
-DriverVer = 06/26/2025,23.19.34.698
+DriverVer = 07/10/2025,12.22.10.489
 CatalogFile=latencyoptimizer.cat
 PnpLockdown=1
 

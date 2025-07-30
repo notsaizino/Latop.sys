@@ -1,4 +1,4 @@
 ﻿  Building 'latency optimizer' with toolset 'WindowsKernelModeDriver10.0' and the 'Desktop' target platform.
-  Source.cpp
-V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\latency optimizer\Source.cpp(86,63): error C2220: the following warning is treated as an error
-V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\latency optimizer\Source.cpp(86,63): warning C4996: 'ExAllocatePoolWithTag': ExAllocatePoolWithTag is deprecated, use ExAllocatePool2.
+  Stamping x64\Debug\latencyoptimizer.inf
+  Stamping [Version] section with DriverVer=07/10/2025,12.22.10.489
+V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\latency optimizer\latencyoptimizer.inf : error 1297: Device driver does not install on any devices, use primitive driver if this is intended.
