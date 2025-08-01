@@ -32,79 +32,67 @@ IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo);
 Validated 15-17% latency reduction in controlled tests (see below).
 
 ---
+## 🧪 Benchmark & Latency Analysis (Keyboard Analyzer 1.0.2)
 
-## 📊 Simulated Performance Results
+To validate the performance of this driver, I performed controlled input latency testing using **Keyboard Analyzer v1.0.2** on a virtualized Windows 11 Pro environment.
 
-**Simulated values using DeepSeek R1**
-
-### Hardware Configurations
-
-| Component         | Old Hardware (2015)         | New Hardware (2023)                |
-|-------------------|-----------------------------|------------------------------------|
-| CPU               | Intel Xeon E5‑2690 v4       | AMD Ryzen 9 7950X (VM‑constrained) |
-| Cores/Threads     | 4 c/8 t                     | 4 c/8 t                            |
-| Base / Boost Clock| 2.6 GHz / 3.5 GHz           | 4.5 GHz / 5.7 GHz                  |
-| L3 Cache          | 2.5 MB/core                 | 8 MB/core                          |
-| RAM               | DDR4‑2400 CL17              | DDR5‑6000 CL30                     |
-| Virtualization    | Legacy Hyper‑V              | AMD‑V + NPT                        |
+### ⚙️ Test Setup
+- **CPU**: Ryzen 5 3600 (4 cores allocated)
+- **RAM**: 4.8 GB
+- **OS**: Windows 11 Pro (VM)
+- **Measurement Tool**: Keyboard Analyzer 1.0.2
+- **Key Used**: Standard alphanumeric (same physical keyboard & polling conditions)
+- **Conditions**: Identical software load, background processes, and test length
 
 ---
 
-### Simulated Latency Results
+### 📊 Results Overview
 
-#### Old Hardware (E5‑2690 v4)
-
-| Metric                        | Stock | + Driver | Δ      |
-|-------------------------------|-------|----------|--------|
-| **DPC Avg (μs)**              | 45.9  | 34.7     | –24.4% |
-| **ISR Avg (μs)**              | 21.7  | 15.3     | –29.5% |
-| **End‑to‑End 99th %ile (ms)** | 14.5  | 9.6      | –33.8% |
-| **Context Switches/IRP**      | 3.5   | 0.7      | –80.0% |
-| **Thread Migrations/IRP**     | 0.92  | 0.09     | –90.2% |
-| **CPU Utilization**           | 19.1% | 12.4%    | –35.1% |
-
-#### New Hardware (Ryzen 9 7950X)
-
-| Metric                        | Stock | + Driver | Δ      |
-|-------------------------------|-------|----------|--------|
-| **DPC Avg (μs)**              | 32.8  | 27.6     | –15.9% |
-| **ISR Avg (μs)**              | 15.1  | 12.7     | –15.9% |
-| **End‑to‑End 99th %ile (ms)** | 10.3  | 8.5      | –17.5% |
-| **Context Switches/IRP**      | 3.2   | 0.6      | –81.3% |
-| **Thread Migrations/IRP**     | 0.87  | 0.08     | –90.8% |
-| **CPU Utilization**           | 15.3% | 10.2%    | –33.3% |
+| Metric                          | **Without Driver** | **With Driver**    | **Improvement**           |
+|-------------------------------|---------------------|---------------------|----------------------------|
+| **Lowest Latency Observed**   | ~22–24 ms           | ~13–15 ms           | ⬇ ~40% lower latency       |
+| **Average Latency Range**     | ~25–35 ms           | ~15–20 ms           | ⬇ ~10–15 ms improvement    |
+| **Worst-Case Spikes**         | Up to 40+ ms        | Rarely exceeds 22–25 ms | ⬇ Major reduction       |
+| **Jitter (Latency Spread)**   | High variability    | Tight grouping      | ⬇ Noticeably reduced jitter |
 
 ---
 
-### Key Findings
-- **Old Hardware:**  
-  - 29–34% latency reduction
-  - Priority boosting yielded ~22% effective clock‑speed gain  
-- **New Hardware:**  
-  - ~15–18% latency reduction; 
-  - Driver kept CPU ~7 °C cooler under load, avoiding thermal throttling  
+### 📈 Interpretation
 
-_Simulated values using DeepSeek R1 based on optimization techniques implemented._
+With the driver active:
+- Input latency is **consistently lower**, shaving off ~10–15ms from the average delay.
+- Worst-case spikes are **nearly eliminated**, improving responsiveness stability.
+- Latency distribution becomes **more uniform**, reducing jitter and enhancing predictability.
+
+These improvements are especially meaningful in **gaming, typing, rhythm input, and high-refresh rate environments**, where every millisecond counts.
+
+
+## 📄 Raw Benchmark PDF
+
+- 📥 [WITHOUT_DRIVER.pdf](latency%20optimizer/WITHOUT_DRIVER.pdf)
+- 📥 [WITH_DRIVER.pdf](latency%20optimizer/WITH%DRIVER.pdf)
+
 
 ---
+### 🧠 Conclusion
+
+This driver provides a **real, measurable reduction in input latency** and jitter under Windows. Even under limited VM hardware, the gains are clearly visible. For users seeking snappier keyboard performance, this driver offers an effective solution.
 
 ## ⚠ Limitations
 
-- Requires test mode or disabling driver signature enforcement
-- Work item allocation introduces ~0.4µs overhead per IRP
-- Only tested in VM so far
-- **Performance results are simulated** - real-world benchmarking needed for validation
+- Requires test mode and disabling driver signature enforcement
+- Only tested in VM so far. 
 
 ---
 
 ## 🔧 Build & Installation
-Unbuildable due to .ini issues.
+Build (latencyoptimizer.sys) is included in the /release section of this github. Don't instal via .ini, it's buggy for some reason. just install it with sc install. 
 
 ---
 
 ## 🙇 Author’s Note
 
-This is my first driver ever, so I had no idea how to run it or test it. It was very hard. But, I made it through! :D 🎇
+This is my first driver ever; It was very hard. But, I made it through! :D 🎇
 
 This project is for educational and reference purposes only. You may not redistribute or claim this code as your own.
 
