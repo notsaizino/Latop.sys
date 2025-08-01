@@ -92,6 +92,7 @@ This driver provides a **real, measurable reduction in input latency** and jitte
 
 ## 🔧 Build & Installation
 Build (latencyoptimizer.sys) is included in the /release section of this github. Don't instal via .ini, it's buggy for some reason. just install it with sc install. 
+Also: It doesn't currently work on baremetal, as the PNP major function hasn't been overwritten yet. 
 
 ---
 
