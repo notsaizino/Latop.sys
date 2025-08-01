@@ -71,7 +71,7 @@ These improvements are especially meaningful in **gaming, typing, rhythm input, 
 
 - 📥 [WITHOUT_DRIVER.pdf](latency%20optimizer/WITHOUT_DRIVER.pdf)
 - 📥 [WITH_DRIVER.pdf](latency%20optimizer/WITH%DRIVER.pdf)
-- 📥 [WITHOUT_DRIVER.kbi](latency%20optimizer/with%driver.kbi)
+- 📥 [WITHOUT_DRIVER.kbi](latency%20optimizer/with%20driver.kbi)
 - 📥 [WITH_DRIVER.kbi](latency%20optimizer/without_driver.kbi)
 
 
