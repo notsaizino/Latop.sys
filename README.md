@@ -67,10 +67,13 @@ With the driver active:
 These improvements are especially meaningful in **gaming, typing, rhythm input, and high-refresh rate environments**, where every millisecond counts.
 
 
-## 📄 Raw Benchmark PDF
+## 📄 Raw Benchmark & Screenshots PDF
 
 - 📥 [WITHOUT_DRIVER.pdf](latency%20optimizer/WITHOUT_DRIVER.pdf)
 - 📥 [WITH_DRIVER.pdf](latency%20optimizer/WITH%DRIVER.pdf)
+- 📥 [WITHOUT_DRIVER.kbi](latency%20optimizer/with%driver.kbi)
+- 📥 [WITH_DRIVER.kbi](latency%20optimizer/without_driver.kbi)
+
 
 
 ---
