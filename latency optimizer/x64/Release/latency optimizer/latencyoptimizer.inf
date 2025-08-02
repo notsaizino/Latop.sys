@@ -1,0 +1,41 @@
+; latencyoptimizer.inf
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = Keyboard
+ClassGuid   = {4D36E96B-E325-11CE-BFC1-08002BE10318}
+Provider    = %ManufacturerName%
+DriverVer = 08/02/2025,15.1.8.299
+CatalogFile = latencyoptimizer.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskName%,,,
+
+[SourceDisksFiles]
+latencyoptimizer.sys = 1
+
+[DefaultInstall.NTamd64]
+CopyFiles = @latencyoptimizer.sys
+AddReg    = FilterAddReg
+
+[DefaultInstall.Services.NTamd64]
+AddService = latencyoptimizer, 0x00000002, ServiceInstall
+
+[ServiceInstall]
+DisplayName   = %ServiceDesc%
+ServiceType   = 1         ; SERVICE_KERNEL_DRIVER
+StartType     = 3         ; SERVICE_DEMAND_START
+ErrorControl  = 1
+ServiceBinary = %12%\latencyoptimizer.sys
+
+[FilterAddReg]
+HKLM,"SYSTEM\CurrentControlSet\Control\Class\{4D36E96B-E325-11CE-BFC1-08002BE10318}","UpperFilters",0x00010008,"latencyoptimizer"
+
+[Strings]
+ManufacturerName = "YourName"
+DiskName         = "LatencyOptimizer Install Disk"
+ServiceDesc      = "Latency Optimizer Keyboard Filter"

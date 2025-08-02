@@ -1,4 +1,24 @@
 ﻿  Building 'latency optimizer' with toolset 'WindowsKernelModeDriver10.0' and the 'Desktop' target platform.
   Stamping x64\Release\latencyoptimizer.inf
-  Stamping [Version] section with DriverVer=07/10/2025,12.25.13.560
-V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\latency optimizer\latencyoptimizer.inf : error 1297: Device driver does not install on any devices, use primitive driver if this is intended.
+  Stamping [Version] section with DriverVer=08/02/2025,15.1.8.299
+V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\latency optimizer\latencyoptimizer.inf(25-25): warning 2083: Section [defaultinstall.services.ntamd64] not referenced or used.
+V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\latency optimizer\latencyoptimizer.inf(28-28): warning 2083: Section [serviceinstall] not referenced or used.
+  Source.cpp
+  latency optimizer.vcxproj -> V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\x64\Release\latencyoptimizer.sys
+  Done Adding Additional Store
+  Successfully signed: V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\x64\Release\latencyoptimizer.sys
+  
+  .........................
+  Signability test complete.
+  
+  Errors:
+  None
+  
+  Warnings:
+  None
+  
+  Catalog generation complete.
+  V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\x64\Release\latency optimizer\latencyoptimizer.cat
+  Done Adding Additional Store
+  Successfully signed: V:\My_Stuff\prog\Micro-cuckDrivers\latency_optimizer\latency optimizer\x64\Release\latency optimizer\latencyoptimizer.cat
+  

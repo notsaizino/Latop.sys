@@ -50,8 +50,14 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING reg
 
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = PassThru; //IRP_MJ_CREATE and IRP_MJ_CLOSE will operate the same way, 
 	//as I don't care about open/close state.
-	DriverObject->MajorFunction[IRP_MJ_CLOSE] = PassThru;
-	DriverObject->MajorFunction[IRP_MJ_READ] = ReadKeyboardInput;
+	DriverObject->MajorFunction[IRP_MJ_CLOSE] = PassThru; 
+	DriverObject->MajorFunction[IRP_MJ_READ] = ReadKeyboardInput; //readirp
+
+	DriverObject->MajorFunction[IRP_MJ_PNP] = PassThru; //pass pnp irp so that the keyboard actually works on bare metal
+	DriverObject->MajorFunction[IRP_MJ_POWER] = PassThru;
+	DriverObject->MajorFunction[IRP_MJ_SHUTDOWN] = PassThru;
+	DriverObject->MajorFunction[IRP_MJ_SYSTEM_CONTROL] = PassThru;
+	
 	DriverObject->DriverExtension->AddDevice = DeviceAttach;
 	DriverObject->DriverUnload = latopUnload;
 
@@ -70,40 +76,49 @@ void Cancelroutine( PDEVICE_OBJECT deviceObject,PIRP irp)
 	
 	PMY_COMPLETION_CONTEXT oldinfo = (PMY_COMPLETION_CONTEXT) irp->Tail.Overlay.DriverContext[0]; //sets the context pointer back to PMY_COMPLETION_CONTEXT type.
 	KdPrint(("Cancel Routine called. \n"));
-	PIO_WORKITEM wrkitem = IoAllocateWorkItem(deviceObject); //allocates work item to defer cleanup of allocated paged mem pool.
+	IoReleaseCancelSpinLock(irp->CancelIrql);
+	PIO_WORKITEM wrkitem = IoAllocateWorkItem(deviceObject); //allocates work item to defer cleanup of allocated nonpaged mem pool.
 	irp->IoStatus.Status = STATUS_CANCELLED; //sets the status of the IRP.
 	irp->IoStatus.Information = 0; //no extra information.
 	if (!wrkitem) {
 		KdPrint(("Error! workitem allocation failed. High likelihood of BSOD!\n"));
+		return;
 		
 	}
-	else { //its ugly, but it works. i have to throw the workitem stuff here, since cancelroutines return void. sorry it's so ugly, but it is what it is.
-		oldinfo->workItem = wrkitem;
-		IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo); //cleanup routine using a work item to ensure it runs in PASSIVE_LEVEL. 
-	}
+	 //its ugly, but it works. i have to throw the workitem stuff here, since cancelroutines return void. sorry it's so ugly, but it is what it is.
+	oldinfo->workItem = wrkitem;
+	IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo); //cleanup routine using a work item to ensure it runs in PASSIVE_LEVEL. 
+
 	
-	IoReleaseCancelSpinLock(irp->CancelIrql); //required so the system frees the spinlock used for the cancellation routine.
+	; //required so the system frees the spinlock used for the cancellation routine.
 	IoCompleteRequest(irp, IO_NO_INCREMENT);
 
 }
 
 void ProperCleaning(PDEVICE_OBJECT DeviceObject, PVOID Context) //this should be much safer now: No more BSODs shoudl happen! YAY!
 {
+	UNREFERENCED_PARAMETER(DeviceObject);
 	PMY_COMPLETION_CONTEXT oldinfo = (PMY_COMPLETION_CONTEXT)Context;
-	PKTHREAD currentThread = (PKTHREAD)PsGetCurrentThread();//this and the if currentthread==oldinfo->thread is just security.
-	if (currentThread == oldinfo->thread) {
-		KeSetPriorityThread(currentThread, oldinfo->oldprio);
-		KeRevertToUserAffinityThreadEx(oldinfo->oldaffinity);
+	if (oldinfo->thread) { //just in case. 
+		KeSetPriorityThread(oldinfo->thread, oldinfo->oldprio); //reverts priority of thread.
+		KeRevertToUserAffinityThreadEx(oldinfo->oldaffinity);//reverts affinity of the thread.
+		ObDereferenceObject(oldinfo->thread);
+		oldinfo->thread = NULL;//added security.
 	}
-	ObDereferenceObject(oldinfo->thread);
 	
-	if (oldinfo->workItem) {
+	
+	
+	
+	if (oldinfo->workItem) { //just in case.
 		IoFreeWorkItem(oldinfo->workItem);
 		oldinfo->workItem = NULL;
 	}
-	ExFreePoolWithTag(oldinfo, 'CTXT');//frees the paged memory pool. NOTE: this causes crashes if CompletionRoutine is running at DISPATCH_LEVEL. MUST FIX. -> Implement a function if the IRQL level is PASSIVE_LEVEL. Otherwise, can't free. 
-	//OR: use work item. Better, and GUARATEES that it gets freed. 
+	if (oldinfo) { //just in case, again.
+		ExFreePoolWithTag(oldinfo, 'CTXT');//frees the nonpaged memory pool. NOTE: this causes crashes if CompletionRoutine is running at DISPATCH_LEVEL. MUST FIX. -> Implement a function if the IRQL level is PASSIVE_LEVEL. Otherwise, can't free. 
+		//OR: use work item. Better, and GUARATEES that it gets freed. 
 
+	}
+	
 }
 
 void latopUnload(PDRIVER_OBJECT DriverObject) //FINISHED.
@@ -145,13 +160,10 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 		KdPrint(("Error: Invalid irp (0x%08X)\n", STATUS_INVALID_PARAMETER));
 
 		return STATUS_INVALID_PARAMETER;
-
-
 	}
 	//initiates a contextinfo struct, which contains oldaffinity, oldpriority and the targetted thread. this will be passed to "IoSetCompletionRoutine" as the "context" argument.
-	PMY_COMPLETION_CONTEXT contextinfo = (PMY_COMPLETION_CONTEXT)ExAllocatePoolWithTag(NonPagedPool, sizeof(MY_COMPLETION_CONTEXT), 'CTXT'); //allocates memory from the non-paged memory pool corresponding to the size of my struct. 
+	PMY_COMPLETION_CONTEXT contextinfo = (PMY_COMPLETION_CONTEXT)ExAllocatePool2(NonPagedPoolNx, sizeof(MY_COMPLETION_CONTEXT), 'CTXT'); //allocates memory from the non-paged memory pool corresponding to the size of my struct. 
 	//contextinfo will be passed as the "context" argument in IoSetCompletionRoutine; 
-	//apparently, NonPagedPoolNx is the new meta (instead of NonPagedPool). Idk much about this, but I'll still leave it as NonPagedPool. I dont want to put something Idk about.
 	if (!contextinfo) { //checks if the allocation succeeded. 
 		KdPrint(("Error: Failed to allocate memory\n"));
 		IoSkipCurrentIrpStackLocation(irp); //ensures the LowerDeviceObject recieves the IRP, if there was an error in allocating memory. 
@@ -171,7 +183,7 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 	KeSetPriorityThread((PKTHREAD)thread, HIGH_PRIORITY); //sets the thread's priority to HIGH. this should speed up IRP processing.
 	
 	ULONG currentcore = KeGetCurrentProcessorNumber();//fetches the current CORE the thread is on. Should be more dynamic, and reduce load on CORE0.
-	KAFFINITY affinityMask = (KAFFINITY)(1 << currentcore); //this transforms the currentcore ULONG into a bitmask representing the core index in currentcore.
+	KAFFINITY affinityMask = (KAFFINITY)(1ULL << currentcore); //this transforms the currentcore ULONG into a bitmask representing the core index in currentcore.
 	//note: we must shift it towards the left, as 0x1 and 0x0 = 1. 0x0 doesn't even exist. //this is like a small edge case. but it ensures everything works smoothly!
 	contextinfo->oldaffinity = KeSetSystemAffinityThreadEx(affinityMask); //Ensures IRP runs on a single CORE, to fully reduce context switching. Even though it says "KeSET", 
 	//this function returns the OLD affinity of the thread. Amazingly useful.
@@ -188,7 +200,7 @@ NTSTATUS ReadKeyboardInput(PDEVICE_OBJECT DeviceObject, PIRP irp)
 
 	NTSTATUS status = IoCallDriver(deviceExtension->LowerDeviceObject, irp); //calls the driver for the keyboard with the IRP that I intercepted.
 	
-	return STATUS_CONTINUE_COMPLETION;//this is necessary in order to make sure that the Completion Routine gets to see the completed IRP before it is terminated;
+	return status;//returns the status of IoCallDriver. i should be using a kdprint macro here, but i cba
 	//i'm using the completion routine in order to "revert" the thread priority & remove the thread pin on the CORE the thread was pinned. .
 }
 
@@ -229,12 +241,19 @@ NTSTATUS DeviceAttach(PDRIVER_OBJECT DriverObject, PDEVICE_OBJECT ActualKeyboard
 
 NTSTATUS CompletionRoutine(PDEVICE_OBJECT DeviceObject, PIRP irp, PVOID Context)
 {
+	
 	UNREFERENCED_PARAMETER(irp);
 	UNREFERENCED_PARAMETER(DeviceObject);
 	
+
 	PMY_COMPLETION_CONTEXT oldinfo = (PMY_COMPLETION_CONTEXT)Context; //typecasting PVOID context to PMY_COMPLETION_CONTEXT.
 	
+	
 	KdPrint(("Completion Routine called. \n"));
+	if (irp->Cancel) {
+		KdPrint(("Completion routine -> Irp was cancelled.\n"));
+		return STATUS_SUCCESS;
+	}
 	PIO_WORKITEM wrkitem = IoAllocateWorkItem(DeviceObject);
 	
 	if (!wrkitem) {
