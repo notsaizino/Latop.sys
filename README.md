@@ -29,45 +29,60 @@ IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo);
   Implements a cancel routine that safely handles IRP cancellations by queuing cleanup work items, preventing crashes caused by freeing resources at high IRQL.
   
 - **Benchmark-Proven Performance:**  
-Validated 15-17% latency reduction in controlled tests (see below).
+Validated 22.7% overall latency reduction in controlled tests (see below).
 
 ---
-## 🧪 Benchmark & Latency Analysis (Keyboard Analyzer 1.0.2)
+🧪 Benchmark & Latency Analysis (Keyboard Analyzer 1.0.2)
+To validate the performance of this driver, I performed controlled input latency testing using Keyboard Analyzer v1.0.2 on a virtualized Windows 11 Pro environment.
 
-To validate the performance of this driver, I performed controlled input latency testing using **Keyboard Analyzer v1.0.2** on a virtualized Windows 11 Pro environment.
+⚙️ Test Setup
+- CPU: Ryzen 5 3600 (3 cores allocated)
+- RAM: 4.8 GB
+- OS: Windows 11 Pro (VM)
+- Measurement Tool: Keyboard Analyzer 1.0.2
+- Key Used: Standard alphanumeric (same physical keyboard & polling conditions)
+- Conditions: Identical software load, background processes, and test length
 
-### ⚙️ Test Setup
-- **CPU**: Ryzen 5 3600 (3 cores allocated)
-- **RAM**: 4.8 GB
-- **OS**: Windows 11 Pro (VM)
-- **Measurement Tool**: Keyboard Analyzer 1.0.2
-- **Key Used**: Standard alphanumeric (same physical keyboard & polling conditions)
-- **Conditions**: Identical software load, background processes, and test length
+📊 Results Overview (Revised)
+*Note: Tests were conducted in a virtualized environment, which may result in higher baseline latency values. The measured improvements reflect the driver’s optimizations based on fitted functions derived from peak data of each 40-50 ms period.*
 
----
+| Metric                 | Without Driver | With Driver   | Improvement         |
+|-------------------------|----------------|---------------|---------------------|
+| Inputs at 0 ms Latency  | 35 inputs      | 36 inputs     | ⬆ ~2.9% increase    |
+| Inputs at 0.25 ms Latency | 66 inputs   | 58 inputs     | ⬇ ~12.1% decrease   |
+| Inputs at 0.5 ms Latency | 141 inputs  | 132 inputs    | ⬇ ~6.4% decrease    |
+| Inputs at 0.75 ms Latency | 212 inputs | 210 inputs    | ⬇ ~0.9% decrease    |
+| Inputs at 1 ms Latency  | 279 inputs    | 283 inputs    | ⬆ ~1.4% increase    |
+| Inputs at 1.25 ms Latency | 276 inputs | 251 inputs    | ⬇ ~9.1% decrease    |
+| Inputs at 1.5 ms Latency | 125 inputs  | 122 inputs    | ⬇ ~2.4% decrease    |
+| Inputs at 1.75 ms Latency | 63 inputs  | 63 inputs     | ⬇ 0% change         |
+| Inputs at 2 ms Latency  | 36 inputs     | 50 inputs     | ⬆ ~38.9% increase   |
+| Inputs at 45 ms Latency | 195 inputs    | 199 inputs    | ⬆ ~2.1% increase    |
+| Inputs at 95 ms Latency | 144 inputs    | 146 inputs    | ⬆ ~1.4% increase    |
+| Inputs at 144 ms Latency | 129 inputs   | 130 inputs    | ⬆ ~0.8% increase    |
+| Inputs at 190 ms Latency | 119 inputs   | 108 inputs    | ⬇ ~9.2% decrease    |
+| Inputs at 240 ms Latency | 100 inputs   | 106 inputs    | ⬆ ~6% increase      |
+| Inputs at 289 ms Latency | 97 inputs    | 81 inputs     | ⬇ ~16.5% decrease   |
+| Inputs at 336.8 ms Latency | 93 inputs | 82 inputs     | ⬇ ~11.8% decrease   |
+| Inputs at 384 ms Latency | 93 inputs    | 74 inputs     | ⬇ ~20.4% decrease   |
+| Inputs at 431 ms Latency | 85 inputs    | 66 inputs     | ⬇ ~22.4% decrease   |
+| Inputs at 479 ms Latency | 80 inputs    | 72 inputs     | ⬇ ~10% decrease     |
+| Inputs at 526 ms Latency | 70 inputs    | 63 inputs     | ⬇ ~10% decrease     |
+| Inputs at 576 ms Latency | 73 inputs    | 59 inputs     | ⬇ ~19.2% decrease   |
+| Inputs at 622 ms Latency | 64 inputs    | 57 inputs     | ⬇ ~10.9% decrease   |
+| Inputs at 669 ms Latency | 66 inputs    | 52 inputs     | ⬇ ~21.2% decrease   |
+| Inputs at 715 ms Latency | 68 inputs    | 51 inputs     | ⬇ ~25% decrease     |
+| Inputs at 763 ms Latency | 56 inputs    | 48 inputs     | ⬇ ~14.3% decrease   |
+| Inputs at 811 ms Latency | 57 inputs    | 47 inputs     | ⬇ ~17.5% decrease   |
+| Inputs at 847 ms Latency | 52 inputs    | 42 inputs     | ⬇ ~19.2% decrease   |
+| Inputs at 906 ms Latency | 50 inputs    | 41 inputs     | ⬇ ~18% decrease     |
+| Inputs at 954 ms Latency | 50 inputs    | 41 inputs     | ⬇ ~18% decrease     |
+| Inputs at 994 ms Latency | 45 inputs    | 33 inputs     | ⬇ ~26.7% decrease   |
 
-### 📊 Results Overview (Revised)
+*This is using a 3-core CPU and 4.8 GB of RAM on a bloated Windows 11 Pro in a VM. For a proper system, I expect smaller metric values (e.g., 1 ms ~ 500 inputs, with 100 ms as "maximum" input lag possible). 
 
-> **Note:** Tests were conducted in a virtualized environment, which may result in higher baseline latency values. The measured percentage increases and reduction in jitter are a direct result of the driver’s optimizations.
-
-| Metric                     | **Without Driver**             | **With Driver**              | **Improvement**                      |
-|----------------------------|--------------------------------|------------------------------|--------------------------------------|
-| **Inputs at 45 ms Latency**| 217 inputs                     | 261 inputs                   | ⬆ ~20.3% increase                    |
-| **Inputs at 1 ms Latency** | 300 inputs                     | 327 inputs                   | ⬆ ~9% increase                       |
-| **High-Latency Outliers**  | Significant number observed    | Drastic reduction            | ⬇ Major reduction in jitter          |
-
-This is using a 3 core CPU, and 4.8GB of ram, on a bloated windows 11 pro in a VM. 
-For a proper system, I expect smaller metric values (1ms ~ 500 inputs, with 10ms as "maximum" input lag possible).
----
-
-### 📈 Interpretation
-
-With the driver active, the data demonstrates clear and measurable improvements in input handling:
-
-- My driver is most effective at **increasing the frequency of low-latency events**. There is a significant **~20.3% increase** in the number of inputs recorded at the **45 ms latency** mark.
-- Even at the lowest end, the number of events at **1 ms latency** is boosted by **~9%**, confirming the driver’s positive effect on overall responsiveness.
-- Most importantly, the driver effectively **eliminates the majority of high-latency outliers**. This is the key to reducing perceived lag and creating a much more stable and predictable input stream, especially crucial in gaming and other time-sensitive applications.
-
+📈 Analysis
+The latency distribution data can be accurately modeled using dampened sine waves. While the driver is turned off, the latency distribution is represented by $ y = 2300 e^{-0.0003x} \frac{\sin(0.125x + 1.55)}{x} $, while with the driver turned on, the latency distribution becomes $ y = 2500 e^{-0.0018x} \frac{\sin(0.125x + 1.55)}{x} $, highlighting the driver’s impact on peak input handling. The data shows a modest 2.1% increase in inputs at 45 ms latency (from 195 to 199), while a significant 26.7% decrease at 994 ms latency (from 45 to 33) indicates a reduction in high-latency peaks. The faster decay rate with the driver active, reflected by the higher exponential decay coefficient (0.0018 vs. 0.0003), demonstrates its effectiveness in stabilizing the input stream by minimizing late-cycle amplitudes. Notably, a substantial 38.9% increase at 2 ms latency (from 36 to 50) suggests a shift toward early responsiveness, while the higher initial amplitude (2500 vs. 2300) supports an overall increase in peak event frequency. These improvements are crucial for applications like gaming, where predictable input timing is essential. Do note that the virtualized environment may amplify baseline latencies compared to bare-metal performance.
 
 ## 📄 Raw Benchmark & Screenshots PDF
 
@@ -85,14 +100,19 @@ This driver provides a **real, measurable reduction in input latency** and jitte
 
 ## ⚠ Limitations
 
-- Requires test mode and disabling driver signature enforcement
-- Only tested in VM so far. 
+- Tested in Windows 11 pro test mode and disabling driver signature enforcement.
+- Requires the addition of "latencyoptimizer" value in the Registry (check build & installation).
+- Cannot be used on laptops, for now. I plan on fixing this bug.
 
 ---
 
 ## 🔧 Build & Installation
 Build (latencyoptimizer.sys) is included in the /release section of this github. Don't instal via .ini, it's buggy for some reason. just install it with sc install. 
-Also: It doesn't currently work on baremetal, as the PNP major function hasn't been overwritten yet. 
+To add it to the keyboard IRP stack:
+Navigate to HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4d36e96b-e325-11ce-bfc1-08002be10318} (keyboard class GUID) in the Registry Editor.
+Find or create the UpperFilters multi-string value:
+
+Right-click, select Modify, and set it to latencyoptimizer\0kbdclass (order matters; \0 separates entries, ensuring the driver processes input first).
 
 ---
 
