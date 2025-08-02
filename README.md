@@ -32,10 +32,10 @@ IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo);
 Validated 22.7% overall latency reduction in controlled tests (see below).
 
 ---
-##🧪 Benchmark & Latency Analysis (Keyboard Analyzer 1.0.2)
+## 🧪 Benchmark & Latency Analysis (Keyboard Analyzer 1.0.2)
 To validate the performance of this driver, I performed controlled input latency testing using Keyboard Analyzer v1.0.2 on a virtualized Windows 11 Pro environment.
 
-###⚙️ Test Setup
+### ⚙️ Test Setup
 - CPU: Ryzen 5 3600 (3 cores allocated)
 - RAM: 4.8 GB
 - OS: Windows 11 Pro (VM)
@@ -43,7 +43,7 @@ To validate the performance of this driver, I performed controlled input latency
 - Key Used: Standard alphanumeric (same physical keyboard & polling conditions)
 - Conditions: Identical software load, background processes, and test length
 
-###📊 Results Overview (Revised)
+### 📊 Results Overview (Revised)
 *Note: Tests were conducted in a virtualized environment, which may result in higher baseline latency values. The measured improvements reflect the driver’s optimizations based on fitted functions derived from peak data of each 40-50 ms period.*
 
 | Metric                 | Without Driver | With Driver   | Improvement         |
@@ -81,7 +81,7 @@ To validate the performance of this driver, I performed controlled input latency
 
 *This is using a 3-core CPU and 4.8 GB of RAM on a bloated Windows 11 Pro in a VM. For a proper system, I expect smaller metric values (e.g., 1 ms ~ 500 inputs, with 100 ms as "maximum" input lag possible)*. 
 
-###📈 Analysis
+### 📈 Analysis
 The latency distribution data can be accurately modeled using dampened sine waves. While the driver is turned off, the latency distribution is represented by $ y = 2300 e^{-0.0003x} \frac{\sin(0.125x + 1.55)}{x} $, while with the driver turned on, the latency distribution becomes $ y = 2500 e^{-0.0018x} \frac{\sin(0.125x + 1.55)}{x} $, highlighting the driver’s impact on peak input handling. The data shows a modest 2.1% increase in inputs at 45 ms latency (from 195 to 199), while a significant 26.7% decrease at 994 ms latency (from 45 to 33) indicates a reduction in high-latency peaks. The faster decay rate with the driver active, reflected by the higher exponential decay coefficient (0.0018 vs. 0.0003), demonstrates its effectiveness in stabilizing the input stream by minimizing late-cycle amplitudes. Notably, a substantial 38.9% increase at 2 ms latency (from 36 to 50) suggests a shift toward early responsiveness, while the higher initial amplitude (2500 vs. 2300) supports an overall increase in peak event frequency. These improvements are crucial for applications like gaming, where predictable input timing is essential. Do note that the virtualized environment may amplify baseline latencies compared to bare-metal performance.
 
 ## 📄 Raw Benchmark & Screenshots PDF
