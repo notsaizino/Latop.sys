@@ -28,8 +28,8 @@ IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo);
 - **Robust Cancellation Handling:**  
   Implements a cancel routine that safely handles IRP cancellations by queuing cleanup work items, preventing crashes caused by freeing resources at high IRQL.
   
-- **Benchmark-Proven Performance:**  
-Validated overall latency reduction in controlled tests (see below).
+- **Net Performance Gain:** Modeled latency curves show a **~22% overall increase** in low-latency inputs (0–100 ms), including **+38.9% at 2 ms** and **+9% at 1 ms**, with **26.7% fewer high-latency outliers**, yielding significantly smoother and more predictable keystrokes with minimal driver overhead.
+
 
 ---
 ## 🧪 Benchmark & Latency Analysis (Keyboard Analyzer 1.0.2)
@@ -46,6 +46,7 @@ To validate the performance of this driver, I performed controlled input latency
 ### 📊 Results Overview (Revised)
 *Note: Tests were conducted in a virtualized environment, which may result in higher baseline latency values. The measured improvements reflect the driver’s optimizations based on fitted functions derived from peak data of each 40-50 ms period. Furthermore, the tests were conducted using an auto-key presser, which clicked the "a" key once every 25ms.*
 
+This table only shows the "peaks" of latency, because that's what is important.
 | Metric                 | Without Driver | With Driver   | Improvement         |
 |-------------------------|----------------|---------------|---------------------|
 | Inputs at 0 ms Latency  | 35 inputs      | 36 inputs     | ⬆ ~2.9% increase    |
