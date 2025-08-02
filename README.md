@@ -84,15 +84,11 @@ To validate the performance of this driver, I performed controlled input latency
 
 The latency distribution data can be accurately modeled using dampened sine waves. While the driver is turned **off**, the latency curve is described by:
 
-\[
-y = 2300 \cdot e^{-0.0003x} \cdot \frac{\sin(0.125x + 1.55)}{x}
-\]
+`y = 2300 * exp(-0.0003 * x) * (sin(0.125 * x + 1.55) / x)`
 
 With the driver **enabled**, the latency distribution becomes:
 
-\[
-y = 2500 \cdot e^{-0.0018x} \cdot \frac{\sin(0.125x + 1.55)}{x}
-\]
+`y = 2500 * exp(-0.0018 * x) * (sin(0.125 * x + 1.55) / x)`
 
 This shift highlights the driver’s impact on **peak input timing and latency decay**.
 
@@ -107,6 +103,7 @@ This shift highlights the driver’s impact on **peak input timing and latency d
 The **steeper exponential decay** with the driver active demonstrates its effectiveness in stabilizing the input stream by reducing the frequency of late-response events. These improvements are especially relevant in **real-time environments**, such as **competitive gaming, rhythm-based software, or high-refresh input tasks**, where tight and predictable input timing is essential.
 
 > ⚠️ *Note: This benchmark was conducted in a virtualized Windows 11 environment. Baseline latencies may be inflated compared to bare-metal performance.*
+
 
 
 ## 📄 Raw Benchmark & Screenshots PDF
