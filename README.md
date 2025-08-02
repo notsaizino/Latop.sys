@@ -29,7 +29,7 @@ IoQueueWorkItem(wrkitem, ProperCleaning, DelayedWorkQueue, oldinfo);
   Implements a cancel routine that safely handles IRP cancellations by queuing cleanup work items, preventing crashes caused by freeing resources at high IRQL.
   
 - **Benchmark-Proven Performance:**  
-Validated 22.7% overall latency reduction in controlled tests (see below).
+Validated overall latency reduction in controlled tests (see below).
 
 ---
 ## 🧪 Benchmark & Latency Analysis (Keyboard Analyzer 1.0.2)
@@ -44,7 +44,7 @@ To validate the performance of this driver, I performed controlled input latency
 - Conditions: Identical software load, background processes, and test length
 
 ### 📊 Results Overview (Revised)
-*Note: Tests were conducted in a virtualized environment, which may result in higher baseline latency values. The measured improvements reflect the driver’s optimizations based on fitted functions derived from peak data of each 40-50 ms period.*
+*Note: Tests were conducted in a virtualized environment, which may result in higher baseline latency values. The measured improvements reflect the driver’s optimizations based on fitted functions derived from peak data of each 40-50 ms period. Furthermore, the tests were conducted using an auto-key presser, which clicked the "a" key once every 25ms.*
 
 | Metric                 | Without Driver | With Driver   | Improvement         |
 |-------------------------|----------------|---------------|---------------------|
@@ -79,7 +79,6 @@ To validate the performance of this driver, I performed controlled input latency
 | Inputs at 954 ms Latency | 50 inputs    | 41 inputs     | ⬇ ~18% decrease     |
 | Inputs at 994 ms Latency | 45 inputs    | 33 inputs     | ⬇ ~26.7% decrease   |
 
-*This is using a 3-core CPU and 4.8 GB of RAM on a bloated Windows 11 Pro in a VM. For a proper system, I expect smaller metric values (e.g., 1 ms ~ 500 inputs, with 100 ms as "maximum" input lag possible)*. 
 
 ### 📈 Analysis
 The latency distribution data can be accurately modeled using dampened sine waves. While the driver is turned off, the latency distribution is represented by $ y = 2300 e^{-0.0003x} \frac{\sin(0.125x + 1.55)}{x} $, while with the driver turned on, the latency distribution becomes $ y = 2500 e^{-0.0018x} \frac{\sin(0.125x + 1.55)}{x} $, highlighting the driver’s impact on peak input handling. The data shows a modest 2.1% increase in inputs at 45 ms latency (from 195 to 199), while a significant 26.7% decrease at 994 ms latency (from 45 to 33) indicates a reduction in high-latency peaks. The faster decay rate with the driver active, reflected by the higher exponential decay coefficient (0.0018 vs. 0.0003), demonstrates its effectiveness in stabilizing the input stream by minimizing late-cycle amplitudes. Notably, a substantial 38.9% increase at 2 ms latency (from 36 to 50) suggests a shift toward early responsiveness, while the higher initial amplitude (2500 vs. 2300) supports an overall increase in peak event frequency. These improvements are crucial for applications like gaming, where predictable input timing is essential. Do note that the virtualized environment may amplify baseline latencies compared to bare-metal performance.
