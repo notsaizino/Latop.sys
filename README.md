@@ -81,7 +81,33 @@ To validate the performance of this driver, I performed controlled input latency
 
 
 ### 📈 Analysis
-The latency distribution data can be accurately modeled using dampened sine waves. While the driver is turned off, the latency distribution is represented by $ y = 2300 e^{-0.0003x} \frac{\sin(0.125x + 1.55)}{x} $, while with the driver turned on, the latency distribution becomes $ y = 2500 e^{-0.0018x} \frac{\sin(0.125x + 1.55)}{x} $, highlighting the driver’s impact on peak input handling. The data shows a modest 2.1% increase in inputs at 45 ms latency (from 195 to 199), while a significant 26.7% decrease at 994 ms latency (from 45 to 33) indicates a reduction in high-latency peaks. The faster decay rate with the driver active, reflected by the higher exponential decay coefficient (0.0018 vs. 0.0003), demonstrates its effectiveness in stabilizing the input stream by minimizing late-cycle amplitudes. Notably, a substantial 38.9% increase at 2 ms latency (from 36 to 50) suggests a shift toward early responsiveness, while the higher initial amplitude (2500 vs. 2300) supports an overall increase in peak event frequency. These improvements are crucial for applications like gaming, where predictable input timing is essential. Do note that the virtualized environment may amplify baseline latencies compared to bare-metal performance.
+
+The latency distribution data can be accurately modeled using dampened sine waves. While the driver is turned **off**, the latency curve is described by:
+
+\[
+y = 2300 \cdot e^{-0.0003x} \cdot \frac{\sin(0.125x + 1.55)}{x}
+\]
+
+With the driver **enabled**, the latency distribution becomes:
+
+\[
+y = 2500 \cdot e^{-0.0018x} \cdot \frac{\sin(0.125x + 1.55)}{x}
+\]
+
+This shift highlights the driver’s impact on **peak input timing and latency decay**.
+
+#### Key Findings:
+
+- **+2.1% increase** in inputs at **45 ms latency** (from 195 to 199)
+- **–26.7% reduction** in high-latency inputs at **994 ms** (from 45 to 33)
+- **+38.9% increase** in low-latency inputs at **2 ms** (from 36 to 50)
+- Faster decay rate (**0.0018 vs. 0.0003**) indicates **stronger suppression of late input noise**
+- **Higher amplitude (2500 vs. 2300)** shows greater initial input response density
+
+The **steeper exponential decay** with the driver active demonstrates its effectiveness in stabilizing the input stream by reducing the frequency of late-response events. These improvements are especially relevant in **real-time environments**, such as **competitive gaming, rhythm-based software, or high-refresh input tasks**, where tight and predictable input timing is essential.
+
+> ⚠️ *Note: This benchmark was conducted in a virtualized Windows 11 environment. Baseline latencies may be inflated compared to bare-metal performance.*
+
 
 ## 📄 Raw Benchmark & Screenshots PDF
 
