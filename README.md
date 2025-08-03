@@ -1,6 +1,6 @@
 ## latop.sys — Windows Keyboard Latency Optimizer
 
-**Author:** Amr Hamail  
+**Author:** A. H 
 **Type:** Windows Kernel-Mode WDM Filter Driver  
 **Purpose:** Reduce keyboard input latency by dynamically elevating thread priority and pinning threads to CPU cores.  
 **Status:** Active Development
