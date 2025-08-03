@@ -115,7 +115,61 @@ The **steeper exponential decay** with the driver active demonstrates its effect
 - 📥 [WITH_DRIVER.kbi](latency%20optimizer/without_driver.kbi)
 
 
+## 📊 Why "Differences Between All Events" (Time Domain)?
 
+### 🤔 Methodology Choice Explanation
+
+When testing keyboard latency improvements, there are several ways to analyze the data. I chose **"Differences Between All Events (Time Domain)"** over consecutive-event analysis for these key reasons:
+
+#### 🔢 **Massive Sample Size = Better Statistics**
+- **All-events analysis**: Compares every keystroke to every other keystroke (O(n²) comparisons)
+- **Consecutive-only**: Only compares adjacent keystrokes (n-1 comparisons)
+- **Result**: Thousands more data points = smoother curves and clearer patterns
+
+#### 🌊 **Reveals System-Wide Scheduling Patterns**  
+My driver doesn't just fix individual keystrokes—it changes how Windows schedules **all** keyboard interrupts over time. The all-events method captures:
+- **Multi-cycle jitter patterns** (like the 40-50ms oscillations I observed)
+- **Long-term scheduling behavior** across many IRP cycles
+- **System-level improvements** beyond just back-to-back timing
+
+#### 🎯 **Better Detection of High-Latency Outliers**
+The worst keyboard lag spikes (those 500ms+ delays) are rare but **extremely noticeable** to users. All-events analysis:
+- **Magnifies these outliers** in the data distribution
+- Makes it easier to **quantify improvements** in worst-case scenarios
+- Shows the **26.7% reduction** in high-latency events more clearly
+
+#### 🌊 **Why Sine Wave Patterns Appear (IRP Batching Analysis)**
+The latency data naturally forms sine wave patterns due to **IRP batching** in the Windows keyboard driver stack:
+
+**Batching Cycle Behavior:**
+- **Valleys (low latency)**: IRPs processed at start of batch cycle
+- **Peaks (high latency)**: IRPs waiting at end of full batch queue
+- **~50ms frequency**: Windows' IRP batch processing interval
+
+**My Driver's Impact:**
+- **Higher amplitude (2500 vs 2300)**: More efficient initial batch processing
+- **Faster decay (0.0018 vs 0.0003)**: Quicker batch queue optimization
+- **Same frequency**: Underlying batch timing preserved, just optimized
+
+The mathematical functions describe how my driver changes the **efficiency of IRP batch processing** over time, creating more predictable input timing within the existing Windows batching framework.
+
+---
+
+## 🧠 Simple Explanation
+
+Think of it like measuring a restaurant's service:
+
+**Consecutive Events** = Only timing orders that come out one after another
+**All Events** = Timing EVERY order compared to EVERY other order
+
+The second method gives you way more data points, so you can see:
+- **Busy periods** (high latency spikes) more clearly
+- **Service patterns** over the whole day
+- Whether your "kitchen improvements" work across all rush periods
+
+**The sine wave pattern** happens because Windows processes keyboard inputs in **batches** - like a restaurant that takes several orders, then cooks them all at once. Orders at the start of a batch get served fast (valleys), orders at the end wait longer (peaks).
+
+My driver makes the "kitchen" (Windows IRP processing) more efficient, so batches get processed faster and more consistently, but the basic batching rhythm stays the same.
 ---
 ### 🧠 Conclusion
 
