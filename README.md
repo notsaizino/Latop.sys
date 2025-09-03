@@ -189,7 +189,7 @@ To add it to the keyboard IRP stack:
 Navigate to HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4d36e96b-e325-11ce-bfc1-08002be10318} (keyboard class GUID) in the Registry Editor.
 Find or create the UpperFilters multi-string value:
 
-Right-click, select Modify, and set it to latencyoptimizer\0kbdclass (order matters; \0 separates entries, ensuring the driver processes input first).
+Right-click, select Modify, and set it to latencyoptimizer\0kbdclass (order matters; \0 is "Enter"; it separates entries, ensuring the driver processes input first).
 
 ---
 
